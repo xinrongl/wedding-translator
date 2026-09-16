@@ -214,6 +214,13 @@ class Settings(BaseSettings):
         description="Cloud Run service name",
     )
 
+    # Access Control
+    speaker_access_key: str | None = Field(
+        default=None,
+        alias="SPEAKER_ACCESS_KEY",
+        description="Shared secret required to open /ws/speaker and start a Gemini Live session (unset = no gate)",
+    )
+
     # Two-Step Pipeline Models (Gemini 3.5 Transcribe Live + Gemini 2.5 Flash)
     transcribe_model: str = Field(
         default="gemini-3.5-transcribe-live-preview",

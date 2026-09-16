@@ -4,6 +4,7 @@ import asyncio
 import json
 import logging
 import math
+import secrets
 import struct
 import time
 from pathlib import Path
@@ -290,6 +291,19 @@ async def websocket_subtitles(websocket: WebSocket):
 async def websocket_speaker(websocket: WebSocket):
     """WebSocket endpoint for Gemini Live streaming, following official Python SDK pattern."""
     await websocket.accept()
+
+    expected_key = settings.speaker_access_key
+    provided_key = websocket.query_params.get("key", "")
+    if expected_key and not secrets.compare_digest(provided_key, expected_key):
+        logger.warning("Speaker WebSocket rejected: invalid access key")
+        await websocket.close(code=4401, reason="Invalid access key")
+        return
+
+    if is_session_active:
+        logger.warning("Speaker WebSocket rejected: a session is already active")
+        await websocket.close(code=4409, reason="A speaker session is already active")
+        return
+
     logger.info("Speaker audio WebSocket accepted")
 
     audio_input_queue: asyncio.Queue[bytes] = asyncio.Queue()

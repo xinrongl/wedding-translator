@@ -98,8 +98,13 @@ export class AudioCaptureService {
           );
         };
 
-        this.websocket.onclose = () => {
+        this.websocket.onclose = (event) => {
           this.stop();
+          if (event.code === 4401 || event.code === 4409) {
+            if (this.callbacks.onError) {
+              this.callbacks.onError(new Error(event.reason || 'Connection rejected by server.'));
+            }
+          }
         };
       });
 

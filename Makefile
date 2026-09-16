@@ -97,7 +97,7 @@ deploy: ## Build container and deploy to Google Cloud Run
 		--source . \
 		--project $(GOOGLE_CLOUD_PROJECT) \
 		--region $(CLOUD_RUN_REGION) \
-		--no-allow-unauthenticated \
+		--allow-unauthenticated \
 		--timeout 3600 \
 		--memory 1Gi \
 		--cpu 1 \

@@ -134,6 +134,8 @@ make proxy            # Open local proxy to Cloud Run service (port 8080)
 
 The project includes a multi-stage `Dockerfile` that packages both the compiled React frontend (`src/app/dist`) and the Python 3.13 FastAPI backend into a single container.
 
+The service is deployed with `--allow-unauthenticated` so wedding guests can open the projector/mobile pages directly without a Google login. The only endpoint that actually starts a (billable) Gemini Live session, `/ws/speaker`, is gated separately by `SPEAKER_ACCESS_KEY` in `.env` — set that to a private value before deploying, and give it only to whoever runs the mic.
+
 ### Deploying via Makefile
 ```bash
 make deploy
@@ -146,11 +148,11 @@ gcloud run deploy wedding-translator \
     --source . \
     --project canvas-aviary-302803 \
     --region australia-southeast2 \
-    --no-allow-unauthenticated \
+    --allow-unauthenticated \
     --timeout 3600 \
     --memory 1Gi \
     --cpu 1 \
-    --min-instances 1 \
+    --min-instances 0 \
     --max-instances 1 \
     --concurrency 250 \
     --no-cpu-throttling \

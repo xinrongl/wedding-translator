@@ -17,7 +17,7 @@ import {
   Rows2,
   Type,
 } from 'lucide-react';
-import { AudioCaptureService } from '../services/audioCapture';
+import { AudioCaptureService, resolveWsUrl } from '../services/audioCapture';
 import type { BackendConfig, SubtitleItem, WeddingContextData, SubtitleFontStyle } from '../types';
 
 interface SpeakerConsoleProps {
@@ -49,6 +49,9 @@ export const SpeakerConsole: React.FC<SpeakerConsoleProps> = ({
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [feedLayout, setFeedLayout] = useState<'side-by-side' | 'stacked'>('side-by-side');
   const [fontStyle, setFontStyle] = useState<SubtitleFontStyle>('serif');
+  const [speakerKey, setSpeakerKey] = useState<string>(
+    () => sessionStorage.getItem('speakerAccessKey') || ''
+  );
 
   const audioServiceRef = useRef<AudioCaptureService | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -86,7 +89,9 @@ export const SpeakerConsole: React.FC<SpeakerConsoleProps> = ({
       setIsStreaming(false);
     } else {
       try {
-        await service.start();
+        const base = resolveWsUrl('/ws/speaker');
+        const wsUrl = speakerKey ? `${base}?key=${encodeURIComponent(speakerKey)}` : base;
+        await service.start(wsUrl);
         setIsStreaming(true);
       } catch (err: unknown) {
         const error = err instanceof Error ? err : new Error(String(err));
@@ -234,10 +239,37 @@ export const SpeakerConsole: React.FC<SpeakerConsoleProps> = ({
 
           {/* Action Button: Start / Stop Microphone */}
           <div
-            className={`pt-4 border-t transition-colors ${
+            className={`pt-4 border-t transition-colors space-y-3 ${
               isDarkTheme ? 'border-[rgba(194,162,101,0.2)]' : 'border-[#DFD7CB]'
             }`}
           >
+            <div>
+              <label
+                htmlFor="speaker-access-key"
+                className={`block text-[10px] uppercase tracking-widest mb-1 ${
+                  isDarkTheme ? 'text-stone-400' : 'text-stone-500'
+                }`}
+              >
+                Access Key
+              </label>
+              <input
+                id="speaker-access-key"
+                type="password"
+                autoComplete="off"
+                disabled={isStreaming}
+                value={speakerKey}
+                onChange={(e) => {
+                  setSpeakerKey(e.target.value);
+                  sessionStorage.setItem('speakerAccessKey', e.target.value);
+                }}
+                placeholder="Ask the couple for the speaker access key"
+                className={`w-full rounded-md px-3 py-2 text-sm border transition-colors ${
+                  isDarkTheme
+                    ? 'bg-[#141311] border-[rgba(194,162,101,0.25)] text-[#FAF8F5] placeholder:text-stone-500'
+                    : 'bg-white border-[#DFD7CB] text-[#1C1A17] placeholder:text-stone-400'
+                }`}
+              />
+            </div>
             <button
               onClick={toggleStreaming}
               className={`w-full py-4 px-6 rounded-md font-sans uppercase tracking-[0.16em] text-xs font-bold flex items-center justify-center space-x-2.5 transition-all shadow-md ${
