@@ -1,0 +1,42 @@
+[project]
+name = "wedding-translator"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+requires-python = ">=3.13"
+dependencies = [
+    "fastapi>=0.141.1",
+    "google-genai>=2.23.0",
+    "pydantic>=2.13.5",
+    "pydantic-settings>=2.15.0",
+    "python-dotenv>=1.2.3",
+    "uvicorn[standard]>=0.53.0",
+    "websockets>=16.1.1",
+]
+
+[dependency-groups]
+dev = [
+    "httpx>=0.28.1",
+    "pytest>=9.1.1",
+    "pytest-asyncio>=1.4.0",
+    "ruff>=0.16.7",
+]
+
+[project.scripts]
+wedding-translator = "translator.main:main"
+
+[build-system]
+requires = ["uv_build>=0.12.5,<0.13.0"]
+build-backend = "uv_build"
+
+[tool.uv.build-backend]
+module-root = "src"
+module-name = ["translator"]
+
+[tool.ruff.lint]
+ignore = ["BLE001"]
+
+[tool.pytest.ini_options]
+markers = [
+    "smoke: quick smoke tests",
+]

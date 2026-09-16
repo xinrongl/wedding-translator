@@ -1,0 +1,397 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Wedding Speech Translator - Gemini Live Console</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    @keyframes pulse-subtle {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.4; }
+    }
+    .typing-pulse {
+      animation: pulse-subtle 1.2s infinite ease-in-out;
+    }
+  </style>
+</head>
+<body class="bg-slate-900 text-slate-100 min-h-screen flex flex-col font-sans">
+
+  <!-- Header -->
+  <header class="border-b border-slate-800 bg-slate-950/80 backdrop-blur px-6 py-4 sticky top-0 z-50">
+    <div class="max-w-6xl mx-auto flex flex-wrap items-center justify-between gap-4">
+      <div class="flex items-center space-x-3">
+        <span class="text-3xl">💍</span>
+        <div>
+          <h1 class="text-xl font-bold bg-gradient-to-r from-amber-200 via-amber-400 to-amber-200 bg-clip-text text-transparent">
+            Wedding Speech Translator
+          </h1>
+          <p class="text-xs text-slate-400">Pure Gemini Live Bidirectional Translation</p>
+        </div>
+      </div>
+      <div class="flex items-center space-x-3 text-xs">
+        <div id="badge-gcp" class="px-2.5 py-1 rounded-full bg-slate-800 border border-slate-700 text-slate-300 flex items-center space-x-1.5">
+          <span class="w-2 h-2 rounded-full bg-yellow-400" id="gcp-dot"></span>
+          <span id="gcp-status">Connecting to Gemini Live...</span>
+        </div>
+        <div id="badge-engine" class="px-2.5 py-1 rounded-full bg-amber-950/60 border border-amber-800/60 text-amber-300 font-mono">
+          <span id="engine-label">gemini-3.5-live-translate-preview</span>
+        </div>
+      </div>
+    </div>
+  </header>
+
+  <!-- Main Content -->
+  <main class="max-w-6xl mx-auto w-full p-6 flex-1 grid grid-cols-1 lg:grid-cols-3 gap-6">
+
+    <!-- Left Column: Controls & Information -->
+    <div class="space-y-6">
+
+      <!-- Audio Ingestion Control Card -->
+      <div class="bg-slate-950/60 border border-slate-800 rounded-2xl p-5 shadow-xl">
+        <h2 class="text-sm font-semibold uppercase tracking-wider text-slate-400 mb-4 flex items-center gap-2">
+          <span>🎙️</span> Microphone Control
+        </h2>
+
+        <div class="space-y-4">
+          <button id="btn-mic" onclick="toggleMicrophone()" class="w-full py-3.5 px-4 rounded-xl font-medium transition flex items-center justify-center space-x-2 shadow-lg bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-slate-950 font-semibold cursor-pointer">
+            <span id="mic-icon">🎙️</span>
+            <span id="mic-text">Start Microphone</span>
+          </button>
+
+          <!-- VU Meter / Audio Level Bar -->
+          <div>
+            <div class="flex justify-between text-xs text-slate-400 mb-1">
+              <span>Mic Input Level</span>
+              <span id="vu-value" class="font-mono">0%</span>
+            </div>
+            <div class="w-full bg-slate-800 h-3 rounded-full overflow-hidden p-0.5">
+              <div id="vu-bar" class="bg-gradient-to-r from-emerald-500 via-amber-400 to-rose-500 h-full w-0 rounded-full transition-all duration-75"></div>
+            </div>
+          </div>
+
+          <div id="status-info" class="text-xs text-slate-400 bg-slate-900/80 p-3 rounded-lg border border-slate-800 font-mono space-y-1">
+            <div>Speaker Stream: <span id="ws-speaker-status" class="text-amber-400">Idle</span></div>
+            <div>Subtitle Feed: <span id="ws-subtitle-status" class="text-amber-400">Connecting...</span></div>
+            <div>Session Status: <span id="live-session-status" class="text-slate-500">Standby</span></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Wedding Info Card -->
+      <div class="bg-slate-950/60 border border-slate-800 rounded-2xl p-5 shadow-xl">
+        <h2 class="text-sm font-semibold uppercase tracking-wider text-slate-400 mb-4 flex items-center gap-2">
+          <span>👰🤵</span> Wedding Information
+        </h2>
+        <div class="space-y-3 text-sm">
+          <div>
+            <label class="text-xs text-slate-400 block mb-1">Couple</label>
+            <div class="text-slate-200 font-medium">Xinrong & Joy</div>
+          </div>
+          <div>
+            <label class="text-xs text-slate-400 block mb-1">Translation Flow</label>
+            <div class="text-slate-200 text-xs">Mandarin Chinese (Simplified) + mixed English ➔ Real-time English Subtitles</div>
+          </div>
+          <div>
+            <label class="text-xs text-slate-400 block mb-1">Model Architecture</label>
+            <div class="text-amber-300/90 text-xs font-mono bg-slate-900 p-2 rounded border border-slate-800">
+              gemini-3.5-live-translate-preview<br>
+              <span class="text-slate-500">Vertex AI (global) • Code-Switching Active</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Actions -->
+      <div class="flex gap-2">
+        <button onclick="clearHistory()" class="flex-1 py-2 text-xs text-slate-400 hover:text-slate-200 bg-slate-950/60 border border-slate-800 rounded-xl hover:border-slate-700 transition">
+          🗑️ Clear History
+        </button>
+        <a href="/api/transcript/export" target="_blank" class="flex-1 py-2 text-center text-xs text-amber-400 hover:text-amber-300 bg-amber-950/30 border border-amber-900/50 rounded-xl hover:border-amber-800 transition">
+          📥 Export Markdown
+        </a>
+      </div>
+
+    </div>
+
+    <!-- Right 2 Columns: Live Subtitle Feed -->
+    <div class="lg:col-span-2 space-y-4 flex flex-col">
+
+      <!-- Active In-Progress / Interim Speech Box -->
+      <div class="bg-gradient-to-r from-slate-950 to-slate-900 border border-amber-500/40 rounded-2xl p-5 shadow-2xl relative overflow-hidden">
+        <div class="flex items-center justify-between text-xs font-semibold uppercase tracking-wider text-amber-400 mb-2">
+          <span class="flex items-center gap-2">
+            <span class="w-2.5 h-2.5 rounded-full bg-amber-400 typing-pulse"></span>
+            Simultaneous Live Stream
+          </span>
+          <span id="interim-status" class="text-slate-400 text-[11px] font-normal">Listening...</span>
+        </div>
+
+        <!-- Real-time Chinese Speech Token Box -->
+        <div class="mb-3">
+          <div class="text-[11px] uppercase tracking-wider text-slate-500 mb-0.5">Spoken Input (Chinese + Mixed English)</div>
+          <p id="interim-chinese" class="text-lg md:text-xl text-slate-300 font-medium min-h-[2rem]">
+            <span class="text-slate-600 italic font-normal text-sm">Waiting for speech...</span>
+          </p>
+        </div>
+
+        <!-- Real-time English Translation Token Box -->
+        <div>
+          <div class="text-[11px] uppercase tracking-wider text-amber-500/70 mb-0.5">English Translation (Output Subtitles)</div>
+          <p id="interim-english" class="text-xl md:text-2xl text-amber-300 font-semibold min-h-[2.5rem] leading-snug">
+            <span class="text-slate-600 italic font-normal text-sm">Translations will appear here instantly in real-time...</span>
+          </p>
+        </div>
+      </div>
+
+      <!-- Finalized Subtitle History Stack -->
+      <div class="bg-slate-950/60 border border-slate-800 rounded-2xl p-5 shadow-xl flex-1 flex flex-col">
+        <div class="flex items-center justify-between border-b border-slate-800 pb-3 mb-4">
+          <h2 class="text-sm font-semibold uppercase tracking-wider text-slate-400 flex items-center gap-2">
+            <span>📜</span> Finalized Subtitles Stream
+          </h2>
+          <span id="subtitle-count" class="text-xs text-slate-500 font-mono">0 segments</span>
+        </div>
+
+        <div id="subtitles-list" class="space-y-4 overflow-y-auto max-h-[520px] pr-2">
+          <div id="empty-state" class="text-center py-16 text-slate-600">
+            <span class="text-4xl block mb-2">🥂</span>
+            <p class="text-sm">No speech segments yet.</p>
+            <p class="text-xs text-slate-700 mt-1">Press "Start Microphone" and speak Chinese (or Chinese with mixed English words) into your mic.</p>
+          </div>
+        </div>
+      </div>
+
+    </div>
+
+  </main>
+
+  <script>
+    let isRecording = false;
+    let speakerWs = null;
+    let subtitleWs = null;
+    let audioCtx = null;
+    let mediaStream = null;
+    let processor = null;
+
+    // 1. Initialize and Check Health
+    async function checkHealth() {
+      try {
+        const res = await fetch('/api/health');
+        const data = await res.json();
+        if (data.status === 'ok') {
+          document.getElementById('gcp-dot').className = 'w-2 h-2 rounded-full bg-emerald-400';
+          document.getElementById('gcp-status').textContent = `GCP Active: ${data.project_id}`;
+          document.getElementById('engine-label').textContent = `${data.transcribe_model} + ${data.translation_model}`;
+        }
+      } catch (err) {
+        document.getElementById('gcp-dot').className = 'w-2 h-2 rounded-full bg-rose-500';
+        document.getElementById('gcp-status').textContent = 'Backend Offline';
+      }
+    }
+
+    // 2. Connect Subtitle WebSocket (Audience Feed)
+    function connectSubtitleWs() {
+      const proto = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+      const wsUrl = `${proto}//${window.location.host}/ws/subtitles`;
+      subtitleWs = new WebSocket(wsUrl);
+
+      subtitleWs.onopen = () => {
+        document.getElementById('ws-subtitle-status').textContent = 'Connected (Listening)';
+        document.getElementById('ws-subtitle-status').className = 'text-emerald-400';
+      };
+
+      subtitleWs.onmessage = (event) => {
+        const msg = JSON.parse(event.data);
+        if (msg.type === 'init') {
+          if (msg.history && msg.history.length > 0) {
+            document.getElementById('empty-state')?.remove();
+            msg.history.forEach(item => appendSubtitle(item));
+          }
+        } else if (msg.type === 'interim') {
+          if (msg.chinese) {
+            document.getElementById('interim-chinese').textContent = msg.chinese;
+          }
+          if (msg.english) {
+            document.getElementById('interim-english').textContent = msg.english;
+          }
+          document.getElementById('interim-status').textContent = 'Interpreting live...';
+        } else if (msg.type === 'final') {
+          // Reset interim view
+          document.getElementById('interim-chinese').innerHTML = '<span class="text-slate-600 italic font-normal text-sm">Listening for speech...</span>';
+          document.getElementById('interim-english').innerHTML = '<span class="text-slate-600 italic font-normal text-sm">Listening for speech...</span>';
+          document.getElementById('interim-status').textContent = 'Sentence finished';
+          appendSubtitle(msg);
+        } else if (msg.type === 'audio_level') {
+          updateVuMeter(msg.level);
+        } else if (msg.type === 'session_status') {
+          const el = document.getElementById('live-session-status');
+          el.textContent = msg.status === 'active' ? 'Active' : 'Standby';
+          el.className = msg.status === 'active' ? 'text-emerald-400 font-semibold' : 'text-slate-500';
+        } else if (msg.type === 'transcript_cleared') {
+          document.getElementById('subtitles-list').innerHTML = `
+            <div id="empty-state" class="text-center py-16 text-slate-600">
+              <span class="text-4xl block mb-2">🥂</span>
+              <p class="text-sm">Transcript cleared.</p>
+            </div>
+          `;
+          document.getElementById('subtitle-count').textContent = '0 segments';
+        }
+      };
+
+      subtitleWs.onclose = () => {
+        document.getElementById('ws-subtitle-status').textContent = 'Disconnected (Reconnecting...)';
+        document.getElementById('ws-subtitle-status').className = 'text-rose-400';
+        setTimeout(connectSubtitleWs, 2000);
+      };
+    }
+
+    function appendSubtitle(item) {
+      document.getElementById('empty-state')?.remove();
+      const list = document.getElementById('subtitles-list');
+
+      const card = document.createElement('div');
+      card.className = 'p-4 rounded-xl bg-slate-900 border border-slate-800 shadow-sm transition hover:border-amber-500/40 space-y-2';
+      
+      card.innerHTML = `
+        <div class="flex items-center justify-between text-xs text-slate-500">
+          <span class="font-mono">${escapeHtml(item.timestamp || '')}</span>
+          <span class="px-2 py-0.5 rounded bg-slate-800 text-slate-400 text-[10px]">Segment #${item.id}</span>
+        </div>
+        <div class="text-slate-300 text-base font-normal">
+          <span class="text-slate-500 mr-2 text-xs">🇨🇳</span>${escapeHtml(item.chinese)}
+        </div>
+        <div class="text-amber-300 text-lg font-medium leading-snug">
+          <span class="text-amber-500/70 mr-2 text-xs">🇬🇧</span>${escapeHtml(item.english)}
+        </div>
+      `;
+
+      list.appendChild(card);
+      list.scrollTop = list.scrollHeight;
+
+      const count = list.children.length;
+      document.getElementById('subtitle-count').textContent = `${count} segment${count === 1 ? '' : 's'}`;
+    }
+
+    function escapeHtml(text) {
+      const div = document.createElement('div');
+      div.textContent = text;
+      return div.innerHTML;
+    }
+
+    function updateVuMeter(level) {
+      const pct = Math.min(100, Math.round(level));
+      document.getElementById('vu-value').textContent = `${pct}%`;
+      document.getElementById('vu-bar').style.width = `${pct}%`;
+    }
+
+    // 3. Microphone Audio Ingestion
+    async function toggleMicrophone() {
+      if (isRecording) {
+        stopMicrophone();
+      } else {
+        await startMicrophone();
+      }
+    }
+
+    async function startMicrophone() {
+      try {
+        const proto = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+        const wsUrl = `${proto}//${window.location.host}/ws/speaker`;
+        speakerWs = new WebSocket(wsUrl);
+
+        speakerWs.onopen = async () => {
+          document.getElementById('ws-speaker-status').textContent = 'Connecting Live Session...';
+          document.getElementById('ws-speaker-status').className = 'text-amber-400';
+
+          mediaStream = await navigator.mediaDevices.getUserMedia({
+            audio: {
+              echoCancellation: true,
+              noiseSuppression: true,
+              autoGainControl: true,
+              channelCount: 1,
+            }
+          });
+
+          audioCtx = new (window.AudioContext || window.webkitAudioContext)({ sampleRate: 16000 });
+          const source = audioCtx.createMediaStreamSource(mediaStream);
+
+          // ScriptProcessor for 16-bit Linear PCM conversion (16kHz)
+          processor = audioCtx.createScriptProcessor(2048, 1, 1);
+          processor.onaudioprocess = (e) => {
+            if (!speakerWs || speakerWs.readyState !== WebSocket.OPEN) return;
+            const float32 = e.inputBuffer.getChannelData(0);
+            const pcm16 = new Int16Array(float32.length);
+            for (let i = 0; i < float32.length; i++) {
+              const s = Math.max(-1, Math.min(1, float32[i]));
+              pcm16[i] = s < 0 ? s * 0x8000 : s * 0x7FFF;
+            }
+            speakerWs.send(pcm16.buffer);
+          };
+
+          source.connect(processor);
+          processor.connect(audioCtx.destination);
+
+          isRecording = true;
+          document.getElementById('btn-mic').className = 'w-full py-3.5 px-4 rounded-xl font-medium transition flex items-center justify-center space-x-2 shadow-lg bg-rose-600 hover:bg-rose-500 text-white font-semibold cursor-pointer';
+          document.getElementById('mic-icon').textContent = '⏹️';
+          document.getElementById('mic-text').textContent = 'Stop Microphone';
+          document.getElementById('ws-speaker-status').textContent = 'Streaming 16kHz PCM';
+          document.getElementById('ws-speaker-status').className = 'text-emerald-400';
+        };
+
+        speakerWs.onerror = (e) => {
+          console.error('Speaker WS error:', e);
+        };
+
+        speakerWs.onclose = () => {
+          document.getElementById('ws-speaker-status').textContent = 'Closed';
+          document.getElementById('ws-speaker-status').className = 'text-slate-400';
+          stopMicrophone();
+        };
+
+      } catch (err) {
+        alert('Could not access microphone: ' + err.message);
+        stopMicrophone();
+      }
+    }
+
+    function stopMicrophone() {
+      isRecording = false;
+      if (processor) {
+        processor.disconnect();
+        processor = null;
+      }
+      if (mediaStream) {
+        mediaStream.getTracks().forEach(t => t.stop());
+        mediaStream = null;
+      }
+      if (audioCtx) {
+        audioCtx.close();
+        audioCtx = null;
+      }
+      if (speakerWs) {
+        speakerWs.close();
+        speakerWs = null;
+      }
+
+      document.getElementById('btn-mic').className = 'w-full py-3.5 px-4 rounded-xl font-medium transition flex items-center justify-center space-x-2 shadow-lg bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-slate-950 font-semibold cursor-pointer';
+      document.getElementById('mic-icon').textContent = '🎙️';
+      document.getElementById('mic-text').textContent = 'Start Microphone';
+      document.getElementById('ws-speaker-status').textContent = 'Idle';
+      document.getElementById('ws-speaker-status').className = 'text-amber-400';
+      updateVuMeter(0);
+    }
+
+    async function clearHistory() {
+      if (confirm('Clear transcript history?')) {
+        await fetch('/api/transcript/clear', { method: 'POST' });
+      }
+    }
+
+    // Startup
+    checkHealth();
+    connectSubtitleWs();
+  </script>
+</body>
+</html>

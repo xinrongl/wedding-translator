@@ -1,0 +1,17 @@
+services:
+  wedding-translator:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: wedding-translator
+    ports:
+      - "${PORT:-8080}:8080"
+    env_file:
+      - .env
+    environment:
+      - PORT=8080
+      - PYTHONUNBUFFERED=1
+      - GOOGLE_APPLICATION_CREDENTIALS=/root/.config/gcloud/application_default_credentials.json
+    volumes:
+      # Mount host gcloud ADC credentials for seamless Vertex AI access
+      - ${HOME}/.config/gcloud:/root/.config/gcloud:ro

@@ -1,0 +1,121 @@
+@import "tailwindcss";
+
+@theme {
+  --font-serif: "Playfair Display", Georgia, "Times New Roman", serif;
+  --font-sans: "Plus Jakarta Sans", system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+
+  /* Stones of the Yarra Valley Authentic Palette */
+  --color-stones-paper: #FAF8F5;
+  --color-stones-cream: #F5EFEB;
+  --color-stones-linen: #ECE5DC;
+  --color-stones-border: #DFD7CB;
+  --color-stones-charcoal: #1C1A17;
+  --color-stones-noir: #141311;
+  --color-stones-muted: #7A746C;
+  --color-stones-soft: #9E968B;
+
+  /* Stones Warm Gold / Brushed Brass */
+  --color-stones-gold: #C2A265;
+  --color-stones-gold-light: #DFCA9B;
+  --color-stones-gold-dark: #98783E;
+  --color-stones-champagne: #F4EBD9;
+
+  /* Estate Nature Accents */
+  --color-stones-sage: #5F6B56;
+  --color-stones-sage-light: #7E8D73;
+  --color-stones-terracotta: #A6685B;
+
+  /* The Stable Candlelight / Dark Aesthetic */
+  --color-stones-dark-bg: #141312;
+  --color-stones-dark-surface: #1B1A18;
+  --color-stones-dark-card: #22201D;
+  --color-stones-dark-border: rgba(194, 162, 101, 0.22);
+}
+
+@layer base {
+  body {
+    background-color: var(--color-stones-paper);
+    color: var(--color-stones-charcoal);
+    font-family: var(--font-sans);
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    overflow-x: hidden;
+  }
+
+  h1, h2, h3, h4, .font-editorial {
+    font-family: var(--font-serif);
+  }
+}
+
+/* Elegant wedding typography & subtle luxury accents */
+.tracking-estate {
+  letter-spacing: 0.18em;
+}
+
+.tracking-wide-caps {
+  letter-spacing: 0.14em;
+}
+
+/* Subtle paper texture overlay */
+.bg-paper-texture {
+  background-color: #FAF8F5;
+  background-image: radial-gradient(rgba(28, 26, 23, 0.03) 1px, transparent 1px);
+  background-size: 24px 24px;
+}
+
+/* The Stable Candlelight glowing aura */
+.glow-candlelight {
+  text-shadow: 0 0 25px rgba(223, 202, 155, 0.45), 0 0 50px rgba(194, 162, 101, 0.25);
+}
+
+.glow-card-gold {
+  box-shadow: 0 10px 40px -10px rgba(194, 162, 101, 0.15), 0 0 1px 1px rgba(194, 162, 101, 0.2);
+}
+
+.glow-card-soft {
+  box-shadow: 0 8px 30px rgba(28, 26, 23, 0.04);
+}
+
+/* Stones signature outline button */
+.btn-stones-outline {
+  border: 1px solid rgba(28, 26, 23, 0.35);
+  background-color: transparent;
+  color: #1C1A17;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.btn-stones-outline:hover {
+  background-color: #1C1A17;
+  color: #FAF8F5;
+  border-color: #1C1A17;
+}
+
+/* Stones gold luxury button */
+.btn-stones-gold {
+  background-color: #C2A265;
+  color: #141311;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  transition: all 0.3s ease;
+}
+
+.btn-stones-gold:hover {
+  background-color: #D4BC88;
+  box-shadow: 0 4px 15px rgba(194, 162, 101, 0.3);
+}
+
+@keyframes pulse-subtle {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.85; transform: scale(0.995); }
+}
+
+.animate-subtle-pulse {
+  animation: pulse-subtle 3s ease-in-out infinite;
+}
+
