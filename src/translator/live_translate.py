@@ -53,8 +53,8 @@ class GeminiLiveTranslator:
         self.translation_model = translation_model or settings.translation_model
         self.input_sample_rate = input_sample_rate
         self.target_language_code = target_language_code
-        self.project_id = project_id or settings.gcp_project_id
-        self.location = location or settings.gcp_location
+        self.project_id = project_id or settings.google_cloud_project
+        self.location = location or settings.google_cloud_location
         self.api_key = api_key
         self.voice_name = voice_name
         self.system_instruction = (

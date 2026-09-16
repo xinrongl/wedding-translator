@@ -1,4 +1,4 @@
-# Wedding Speech Translator 💍
+# Wedding Speech Translator
 
 A lightweight, low-latency, real-time speech translation web service designed specifically for wedding ceremonies and banquets.
 
@@ -49,7 +49,7 @@ Built natively on Google's **Gemini Live Translation API** (`gemini-3.5-live-tra
 Ensure you have Google Cloud SDK installed and authenticated with Application Default Credentials (ADC):
 ```bash
 gcloud auth application-default login
-gcloud config set project ktzdeir-agbg-anz-gemini-vertex
+gcloud config set project canvas-aviary-302803
 ```
 
 ### 2. Installation
@@ -85,19 +85,19 @@ make app-down
 
 Built with **React 19**, **TypeScript**, and **Tailwind CSS v4** via **Vite**, the frontend delivers responsive, low-latency UI across three specialized viewports:
 
-1. 📽 **Projector Mode (`/projector` or `/#projector`)**:
+1. **Projector Mode (`/projector` or `/#projector`)**:
    - Designed for venue 1080p / 4K projection and LED stage walls.
    - **Active Spotlight**: Massive Champagne Gold English subtitles (`text-6xl`) with subtle ambient glow.
    - **Context Cascade**: Preceding sentences fade softly above for seamless reading.
    - **Controls**: Press <kbd>F</kbd> for fullscreen, toggle Bilingual / English-only mode, and adjust font sizes.
 
-2. 🎙 **Speaker & Admin Console (`/speaker` or `/#speaker`)**:
+2. **Speaker & Admin Console (`/speaker` or `/#speaker`)**:
    - Web Audio API microphone capture downsampling dynamically to 16,000 Hz 16-bit linear PCM.
    - Real-time animated VU energy meter (RMS level).
    - Live side-by-side feed comparing spoken Chinese (+ mixed English) vs translated English.
    - Single-click transcript export (Markdown / CSV) and clear session controls.
 
-3. 📱 **Mobile Guest View (`/mobile` or `/#mobile`)**:
+3. **Mobile Guest View (`/mobile` or `/#mobile`)**:
    - Lightweight, mobile-first feed optimized for banquet guests following on smartphones via venue QR code.
    - Auto-scroll lock toggle, font scaling, and native link sharing.
 
@@ -138,13 +138,13 @@ The project includes a multi-stage `Dockerfile` that packages both the compiled 
 ```bash
 make deploy
 ```
-*(Optionally override project or region: `make deploy GCP_PROJECT=my-project GCP_REGION=australia-southeast1`)*
+*(Optionally override project or region: `make deploy GOOGLE_CLOUD_PROJECT=my-project CLOUD_RUN_REGION=australia-southeast1`)*
 
 ### Deploying via `gcloud` CLI directly
 ```bash
 gcloud run deploy wedding-translator \
     --source . \
-    --project ktzdeir-agbg-anz-gemini-vertex \
+    --project canvas-aviary-302803 \
     --region australia-southeast2 \
     --no-allow-unauthenticated \
     --timeout 3600 \
@@ -154,7 +154,7 @@ gcloud run deploy wedding-translator \
     --max-instances 1 \
     --concurrency 250 \
     --no-cpu-throttling \
-    --port 8000 \
+    --port 8080 \
     --env-vars-file .env
 ```
 

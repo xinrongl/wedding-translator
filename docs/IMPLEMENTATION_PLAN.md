@@ -79,7 +79,7 @@ Adapted directly from the official [`google-gemini/gemini-live-api-examples`](ht
   `async def start_session(...)` yields structured events (`session_status`, `interim`, `final`, `audio_level`, `interrupted`) while guaranteeing clean task cancellation (`send_audio_task`, `send_text_task`, `receive_task`) in `finally:` blocks.
 - **Translation Specific Configuration**:
   ```python
-  client = genai.Client(vertexai=True, project=settings.gcp_project_id, location="global")
+  client = genai.Client(vertexai=True, project=settings.google_cloud_project, location="global")
   config = types.LiveConnectConfig(
       response_modalities=[types.Modality.AUDIO],
       speech_config=types.SpeechConfig(
@@ -100,8 +100,8 @@ Adapted directly from the official [`google-gemini/gemini-live-api-examples`](ht
 
 #### [`src/translator/config.py`](file:///home/xinronglin/projects/wedding-translator/src/translator/config.py)
 Streamlined application configuration:
-- `gcp_project_id`: `ktzdeir-agbg-anz-gemini-vertex`
-- `gcp_location`: `global` (Vertex AI Live Translate preview location)
+- `google_cloud_project`: `canvas-aviary-302803`
+- `google_cloud_location`: `global` (Vertex AI Live Translate preview location)
 - `live_model`: `gemini-3.5-live-translate-preview`
 - `target_language`: `en`
 - `enable_audio_stream`: `False` (audio toggle for guest earbuds)

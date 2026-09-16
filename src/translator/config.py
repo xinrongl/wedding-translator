@@ -188,9 +188,9 @@ class Settings(BaseSettings):
     version: str = "0.2.0"
 
     # Google Cloud & Vertex AI
-    gcp_project_id: str | None = Field(
-        default="canvas-aviary-302803",
-        alias="GCP_PROJECT_ID",
+    google_cloud_project: str | None = Field(
+        default=None,
+        alias="GOOGLE_CLOUD_PROJECT",
         description="Google Cloud Project ID",
     )
     cloud_run_region: str = Field(
@@ -198,12 +198,12 @@ class Settings(BaseSettings):
         alias="CLOUD_RUN_REGION",
         description="Google Cloud Run deployment region (Melbourne)",
     )
-    gcp_location: str = Field(
+    google_cloud_location: str = Field(
         default="global",
-        alias="GCP_LOCATION",
+        alias="GOOGLE_CLOUD_LOCATION",
         description="Vertex AI region (default: global)",
     )
-    google_api_key: str | None = Field(
+    gemini_api_key: str | None = Field(
         default=None,
         alias="GEMINI_API_KEY",
         description="API key for Gemini (optional when using ADC on Vertex AI)",

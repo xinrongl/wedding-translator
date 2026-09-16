@@ -180,8 +180,8 @@ async def health_check():
     """Verify backend and Gemini Live configuration."""
     return {
         "status": "ok",
-        "project_id": settings.gcp_project_id,
-        "location": settings.gcp_location,
+        "project_id": settings.google_cloud_project,
+        "location": settings.google_cloud_location,
         "transcribe_model": settings.transcribe_model,
         "translation_model": settings.translation_model,
         "source_language": settings.source_language_description,
@@ -195,8 +195,8 @@ async def health_check():
 async def get_config():
     """Get active configuration."""
     return {
-        "project_id": settings.gcp_project_id,
-        "location": settings.gcp_location,
+        "project_id": settings.google_cloud_project,
+        "location": settings.google_cloud_location,
         "transcribe_model": settings.transcribe_model,
         "translation_model": settings.translation_model,
         "source_language": settings.source_language_description,

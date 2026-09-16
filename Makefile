@@ -10,11 +10,10 @@ ifneq (,$(wildcard $(ENV_FILE)))
   export
 endif
 
-# Configuration variables derived from .env with fallback defaults
-GCP_PROJECT ?= $(or $(GOOGLE_CLOUD_PROJECT),ktzdeir-agbg-anz-gemini-vertex)
-GCP_REGION ?= $(or $(CLOUD_RUN_REGION),australia-southeast2)
-SERVICE_NAME ?= $(or $(SERVICE_NAME),wedding-translator)
-GCP_ACCOUNT ?= $(shell gcloud config get-value account 2>/dev/null || echo "xinrong.lin@accenture.com")
+# Configuration variables — sourced from .env (Single Source of Truth); override on the CLI if needed
+CLOUD_RUN_REGION ?= australia-southeast2
+SERVICE_NAME ?= wedding-translator
+GCP_ACCOUNT ?= $(shell gcloud config get-value account 2>/dev/null || echo "xinronglin@outlook.com")
 UV := uv run
 DOCKER_COMPOSE ?= $(shell which docker-compose 2>/dev/null || echo "docker compose")
 
@@ -96,13 +95,13 @@ deploy: ## Build container and deploy to Google Cloud Run
 	fi; \
 	gcloud run deploy $(SERVICE_NAME) \
 		--source . \
-		--project $(GCP_PROJECT) \
-		--region $(GCP_REGION) \
+		--project $(GOOGLE_CLOUD_PROJECT) \
+		--region $(CLOUD_RUN_REGION) \
 		--no-allow-unauthenticated \
 		--timeout 3600 \
 		--memory 1Gi \
 		--cpu 1 \
-		--min-instances 1 \
+		--min-instances 0 \
 		--max-instances 1 \
 		--concurrency 250 \
 		--no-cpu-throttling \
@@ -117,13 +116,13 @@ allow: ## Grant Cloud Run invoker role (default: current user, PUBLIC=1 for allU
 	if [ "$(PUBLIC)" = "1" ]; then MEMBER="allUsers"; fi; \
 	echo "Granting roles/run.invoker to $$MEMBER on $(SERVICE_NAME)..."; \
 	gcloud run services add-iam-policy-binding $(SERVICE_NAME) \
-		--region=$(GCP_REGION) \
-		--project=$(GCP_PROJECT) \
+		--region=$(CLOUD_RUN_REGION) \
+		--project=$(GOOGLE_CLOUD_PROJECT) \
 		--member="$$MEMBER" \
 		--role="roles/run.invoker"
 
 proxy: ## Run authenticated localhost proxy to the Cloud Run service (port 8080)
-	gcloud run services proxy $(SERVICE_NAME) --region=$(GCP_REGION) --project=$(GCP_PROJECT) --port=8080
+	gcloud run services proxy $(SERVICE_NAME) --region=$(CLOUD_RUN_REGION) --project=$(GOOGLE_CLOUD_PROJECT) --port=8080
 
 .allow-public:
 	@$(MAKE) allow PUBLIC=1

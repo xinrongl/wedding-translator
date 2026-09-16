@@ -15,7 +15,7 @@ def main():
     logger.info("=" * 60)
     logger.info("Wedding Speech Real-time Translator (Gemini Live API)")
     logger.info(
-        f"GCP Project: {settings.gcp_project_id} (Location: {settings.gcp_location})"
+        f"GCP Project: {settings.google_cloud_project} (Location: {settings.google_cloud_location})"
     )
     logger.info(f"Live ASR Model: {settings.transcribe_model}")
     logger.info(f"Translation Model: {settings.translation_model}")
