@@ -189,7 +189,7 @@ class Settings(BaseSettings):
 
     # Google Cloud & Vertex AI
     gcp_project_id: str | None = Field(
-        default="ktzdeir-agbg-anz-gemini-vertex",
+        default="canvas-aviary-302803",
         alias="GCP_PROJECT_ID",
         description="Google Cloud Project ID",
     )

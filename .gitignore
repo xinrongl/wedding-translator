@@ -1,0 +1,21 @@
+# Python
+__pycache__/
+*.py[oc]
+build/
+dist/
+wheels/
+*.egg-info
+
+# Venv
+.venv/
+
+# Caches
+.pytest_cache/
+.ruff_cache/
+uv.lock
+
+# Nodes
+node_modules/
+
+# Env
+.envs
