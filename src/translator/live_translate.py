@@ -90,7 +90,10 @@ class GeminiLiveTranslator:
         asr_config = types.LiveConnectConfig(
             response_modalities=[types.Modality.TEXT],
             input_audio_transcription=types.AudioTranscriptionConfig(
-                language_codes=lang_codes if lang_codes else None,
+                # The API rejects language_codes in SMART mode (it auto-detects).
+                language_codes=lang_codes
+                if lang_codes and settings.stt_mode != "SMART"
+                else None,
                 mode=stt_mode,
                 custom_vocabulary=custom_vocab,
             ),
