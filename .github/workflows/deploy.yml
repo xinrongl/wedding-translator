@@ -1,0 +1,48 @@
+# Deploys to Cloud Run with `make deploy` on every push to master (i.e. every merge).
+#
+# One-time setup — GitHub repo secrets (Settings > Secrets and variables > Actions):
+#   GCP_WORKLOAD_IDENTITY_PROVIDER  projects/<num>/locations/global/workloadIdentityPools/<pool>/providers/<provider>
+#   GCP_SERVICE_ACCOUNT             deployer service account email
+#   APP_ENV_FILE                    full contents of your local .env (it is gitignored, so CI recreates it)
+name: Deploy to Cloud Run
+
+on:
+  push:
+    branches: [master]
+  workflow_dispatch:
+
+concurrency:
+  group: deploy-master
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+  id-token: write
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: ${{ secrets.GCP_WORKLOAD_IDENTITY_PROVIDER }}
+          service_account: ${{ secrets.GCP_SERVICE_ACCOUNT }}
+
+      - uses: google-github-actions/setup-gcloud@v2
+
+      # `make deploy` builds its Cloud Run env-vars file with python-dotenv + PyYAML.
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+      - run: pip install python-dotenv pyyaml
+
+      - name: Write .env
+        env:
+          APP_ENV_FILE: ${{ secrets.APP_ENV_FILE }}
+        run: printf '%s\n' "$APP_ENV_FILE" > .env
+
+      - name: Deploy
+        run: make deploy
