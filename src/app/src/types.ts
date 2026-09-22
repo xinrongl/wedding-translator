@@ -22,6 +22,7 @@ export interface BackendConfig {
   target_language: string;
   wedding: WeddingContextData;
   enable_live_audio_stream: boolean;
+  google_oauth_client_id: string | null;
 }
 
 export type ViewMode = 'projector' | 'speaker' | 'mobile';

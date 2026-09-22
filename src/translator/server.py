@@ -4,7 +4,6 @@ import asyncio
 import json
 import logging
 import math
-import secrets
 import struct
 import time
 from pathlib import Path
@@ -14,6 +13,8 @@ from fastapi import FastAPI, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, HTMLResponse, PlainTextResponse
 from fastapi.staticfiles import StaticFiles
+from google.auth.transport import requests as google_auth_requests
+from google.oauth2 import id_token as google_id_token
 from pydantic import BaseModel
 
 from translator.config import ROOT, settings
@@ -21,6 +22,29 @@ from translator.live_translate import GeminiLiveTranslator
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("wedding_translator.server")
+
+# Reused across requests: fetches and caches Google's public signing keys.
+_google_auth_transport = google_auth_requests.Request()
+
+
+def verify_speaker_identity(token: str) -> str | None:
+    """Verify a Google 'Sign in with Google' ID token and return the verified email if the
+    account is in the approved allowlist, else None."""
+    if not token:
+        return None
+    try:
+        claims = google_id_token.verify_oauth2_token(
+            token, _google_auth_transport, settings.google_oauth_client_id
+        )
+    except Exception as e:
+        logger.warning(f"Speaker ID token verification failed: {e}")
+        return None
+
+    email = (claims.get("email") or "").lower()
+    if not claims.get("email_verified") or email not in settings.speaker_allowed_emails_set:
+        logger.warning(f"Speaker WebSocket rejected: {email or 'unknown account'} is not approved")
+        return None
+    return email
 
 app = FastAPI(
     title="Wedding Speech Translator (Gemini Live)",
@@ -204,6 +228,8 @@ async def get_config():
         "target_language": settings.target_language,
         "wedding": settings.wedding.model_dump(),
         "enable_live_audio_stream": settings.enable_live_audio_stream,
+        # Public by design: Google Identity Services requires the client ID in frontend JS.
+        "google_oauth_client_id": settings.google_oauth_client_id,
     }
 
 
@@ -292,19 +318,30 @@ async def websocket_speaker(websocket: WebSocket):
     """WebSocket endpoint for Gemini Live streaming, following official Python SDK pattern."""
     await websocket.accept()
 
-    expected_key = settings.speaker_access_key
-    provided_key = websocket.query_params.get("key", "")
-    if expected_key and not secrets.compare_digest(provided_key, expected_key):
-        logger.warning("Speaker WebSocket rejected: invalid access key")
-        await websocket.close(code=4401, reason="Invalid access key")
-        return
+    verified_email: str | None = None
+    if settings.google_oauth_client_id:
+        provided_token = websocket.query_params.get("id_token", "")
+        verified_email = verify_speaker_identity(provided_token)
+        if not verified_email:
+            await websocket.close(
+                code=4401,
+                reason="Sign in with an approved Google account to start streaming",
+            )
+            return
+    else:
+        logger.warning(
+            "GOOGLE_OAUTH_CLIENT_ID is not set — /ws/speaker accepts any client. "
+            "Set GOOGLE_OAUTH_CLIENT_ID and SPEAKER_ALLOWED_EMAILS before deploying."
+        )
 
     if is_session_active:
         logger.warning("Speaker WebSocket rejected: a session is already active")
         await websocket.close(code=4409, reason="A speaker session is already active")
         return
 
-    logger.info("Speaker audio WebSocket accepted")
+    logger.info(
+        f"Speaker audio WebSocket accepted{f' for {verified_email}' if verified_email else ''}"
+    )
 
     audio_input_queue: asyncio.Queue[bytes] = asyncio.Queue()
     text_input_queue: asyncio.Queue[str] = asyncio.Queue()

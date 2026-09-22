@@ -5,7 +5,8 @@
 
 export interface AudioCaptureCallbacks {
   onAudioLevel?: (level: number) => void;
-  onError?: (err: Error) => void;
+  /** `code` is the WebSocket close code when the server rejected the connection (e.g. 4401). */
+  onError?: (err: Error, code?: number) => void;
   onStateChange?: (isRecording: boolean) => void;
 }
 
@@ -102,7 +103,10 @@ export class AudioCaptureService {
           this.stop();
           if (event.code === 4401 || event.code === 4409) {
             if (this.callbacks.onError) {
-              this.callbacks.onError(new Error(event.reason || 'Connection rejected by server.'));
+              this.callbacks.onError(
+                new Error(event.reason || 'Connection rejected by server.'),
+                event.code
+              );
             }
           }
         };

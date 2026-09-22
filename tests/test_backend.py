@@ -1,16 +1,19 @@
 """Comprehensive test suite for the Wedding Translator backend (Two-Step Transcribe Architecture)."""
 
+from unittest.mock import patch
+
 import pytest
 from fastapi.testclient import TestClient
 
 from translator.config import (
     AudioConfig,
+    Settings,
     WeddingContext,
     build_wedding_translation_instruction,
     settings,
 )
 from translator.live_translate import GeminiLiveTranslator, create_translator
-from translator.server import app, calculate_pcm_level
+from translator.server import app, calculate_pcm_level, verify_speaker_identity
 
 
 @pytest.mark.smoke
@@ -164,3 +167,52 @@ def test_create_translator():
     assert isinstance(translator, GeminiLiveTranslator)
     assert translator.transcribe_model == "gemini-3.5-transcribe-live-preview"
     assert translator.translation_model == "gemini-3.5-flash"
+
+
+def test_speaker_allowed_emails_set_normalizes():
+    """Verify the allowlist is trimmed, lowercased, and drops blanks."""
+    s = Settings(speaker_allowed_emails=" Approved@Example.com, second@example.com ,")
+    assert s.speaker_allowed_emails_set == {"approved@example.com", "second@example.com"}
+
+
+def test_verify_speaker_identity_rejects_missing_token():
+    """No token provided should never verify, regardless of Google's response."""
+    assert verify_speaker_identity("") is None
+
+
+def test_verify_speaker_identity_rejects_invalid_signature():
+    """A token that fails Google's signature/audience/expiry check is rejected."""
+    with patch(
+        "translator.server.google_id_token.verify_oauth2_token",
+        side_effect=ValueError("invalid token"),
+    ):
+        assert verify_speaker_identity("garbage") is None
+
+
+def test_verify_speaker_identity_rejects_unverified_email(monkeypatch):
+    """A structurally valid token for an unverified email address is rejected."""
+    monkeypatch.setattr(settings, "speaker_allowed_emails", "approved@example.com")
+    with patch(
+        "translator.server.google_id_token.verify_oauth2_token",
+        return_value={"email": "approved@example.com", "email_verified": False},
+    ):
+        assert verify_speaker_identity("token") is None
+
+
+def test_verify_speaker_identity_rejects_unapproved_account():
+    """A verified Google account that isn't on the allowlist is rejected."""
+    with patch(
+        "translator.server.google_id_token.verify_oauth2_token",
+        return_value={"email": "stranger@example.com", "email_verified": True},
+    ):
+        assert verify_speaker_identity("token") is None
+
+
+def test_verify_speaker_identity_accepts_approved_account(monkeypatch):
+    """A verified, allowlisted Google account is accepted (case-insensitively)."""
+    monkeypatch.setattr(settings, "speaker_allowed_emails", "Approved@Example.com")
+    with patch(
+        "translator.server.google_id_token.verify_oauth2_token",
+        return_value={"email": "approved@example.com", "email_verified": True},
+    ):
+        assert verify_speaker_identity("token") == "approved@example.com"

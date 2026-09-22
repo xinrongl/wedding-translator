@@ -214,12 +214,23 @@ class Settings(BaseSettings):
         description="Cloud Run service name",
     )
 
-    # Access Control
-    speaker_access_key: str | None = Field(
+    # Access Control (Sign in with Google)
+    google_oauth_client_id: str | None = Field(
         default=None,
-        alias="SPEAKER_ACCESS_KEY",
-        description="Shared secret required to open /ws/speaker and start a Gemini Live session (unset = no gate)",
+        alias="GOOGLE_OAUTH_CLIENT_ID",
+        description="OAuth 2.0 Web Client ID (Google Cloud Console > Credentials) used to verify "
+        "'Sign in with Google' ID tokens before opening /ws/speaker (unset = no gate)",
     )
+    speaker_allowed_emails: str = Field(
+        default="405896828.xl@gmail.com",
+        alias="SPEAKER_ALLOWED_EMAILS",
+        description="Comma-separated Google account emails allowed to start a speaker session",
+    )
+
+    @property
+    def speaker_allowed_emails_set(self) -> set[str]:
+        """Normalized (trimmed, lowercased) set of emails allowed to open /ws/speaker."""
+        return {e.strip().lower() for e in self.speaker_allowed_emails.split(",") if e.strip()}
 
     # Two-Step Pipeline Models (Gemini 3.5 Transcribe Live + Gemini 2.5 Flash)
     transcribe_model: str = Field(

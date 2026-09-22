@@ -18,6 +18,7 @@ import {
   Type,
 } from 'lucide-react';
 import { AudioCaptureService, resolveWsUrl } from '../services/audioCapture';
+import { decodeGoogleIdToken, loadGoogleIdentityScript, type GoogleIdentityClaims } from '../services/googleAuth';
 import type { BackendConfig, SubtitleItem, WeddingContextData, SubtitleFontStyle } from '../types';
 
 interface SpeakerConsoleProps {
@@ -49,19 +50,64 @@ export const SpeakerConsole: React.FC<SpeakerConsoleProps> = ({
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [feedLayout, setFeedLayout] = useState<'side-by-side' | 'stacked'>('side-by-side');
   const [fontStyle, setFontStyle] = useState<SubtitleFontStyle>('serif');
-  const [speakerKey, setSpeakerKey] = useState<string>(
-    () => sessionStorage.getItem('speakerAccessKey') || ''
-  );
+  const [idToken, setIdToken] = useState<string | null>(null);
+  const [googleUser, setGoogleUser] = useState<GoogleIdentityClaims | null>(null);
 
   const audioServiceRef = useRef<AudioCaptureService | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
+  const googleButtonRef = useRef<HTMLDivElement>(null);
+
+  const oauthClientId = backendConfig?.google_oauth_client_id ?? null;
+
+  // Load Google Identity Services and render its "Sign in with Google" button once the
+  // client ID arrives from the backend. Only the speaker console pulls this script in.
+  useEffect(() => {
+    if (!oauthClientId) return;
+    let cancelled = false;
+
+    loadGoogleIdentityScript()
+      .then(() => {
+        if (cancelled || !window.google || !googleButtonRef.current) return;
+        window.google.accounts.id.initialize({
+          client_id: oauthClientId,
+          callback: (response) => {
+            setIdToken(response.credential);
+            setGoogleUser(decodeGoogleIdToken(response.credential));
+            setErrorMessage(null);
+          },
+        });
+        googleButtonRef.current.innerHTML = '';
+        window.google.accounts.id.renderButton(googleButtonRef.current, {
+          theme: isDarkTheme ? 'filled_black' : 'outline',
+          size: 'medium',
+          text: 'signin_with',
+        });
+      })
+      .catch((err: Error) => setErrorMessage(err.message));
+
+    return () => {
+      cancelled = true;
+    };
+  }, [oauthClientId, isDarkTheme]);
+
+  const handleSignOut = () => {
+    setIdToken(null);
+    setGoogleUser(null);
+    window.google?.accounts.id.disableAutoSelect();
+  };
 
   useEffect(() => {
     const service = new AudioCaptureService({
       onAudioLevel: (lvl) => setLocalAudioLevel(lvl),
-      onError: (err) => {
+      onError: (err, code) => {
         setErrorMessage(err.message);
         setIsStreaming(false);
+        if (code === 4401) {
+          // The token was rejected or has expired — drop it so the Sign In
+          // button reappears instead of showing a stale "signed in" state.
+          setIdToken(null);
+          setGoogleUser(null);
+        }
       },
       onStateChange: (state) => setIsStreaming(state),
     });
@@ -88,9 +134,13 @@ export const SpeakerConsole: React.FC<SpeakerConsoleProps> = ({
       service.stop();
       setIsStreaming(false);
     } else {
+      if (oauthClientId && !idToken) {
+        setErrorMessage('Sign in with an approved Google account first.');
+        return;
+      }
       try {
         const base = resolveWsUrl('/ws/speaker');
-        const wsUrl = speakerKey ? `${base}?key=${encodeURIComponent(speakerKey)}` : base;
+        const wsUrl = idToken ? `${base}?id_token=${encodeURIComponent(idToken)}` : base;
         await service.start(wsUrl);
         setIsStreaming(true);
       } catch (err: unknown) {
@@ -245,34 +295,71 @@ export const SpeakerConsole: React.FC<SpeakerConsoleProps> = ({
           >
             <div>
               <label
-                htmlFor="speaker-access-key"
-                className={`block text-[10px] uppercase tracking-widest mb-1 ${
+                className={`block text-[10px] uppercase tracking-widest mb-1.5 ${
                   isDarkTheme ? 'text-stone-400' : 'text-stone-500'
                 }`}
               >
-                Access Key
+                Speaker Sign-In
               </label>
-              <input
-                id="speaker-access-key"
-                type="password"
-                autoComplete="off"
-                disabled={isStreaming}
-                value={speakerKey}
-                onChange={(e) => {
-                  setSpeakerKey(e.target.value);
-                  sessionStorage.setItem('speakerAccessKey', e.target.value);
-                }}
-                placeholder="Ask the couple for the speaker access key"
-                className={`w-full rounded-md px-3 py-2 text-sm border transition-colors ${
-                  isDarkTheme
-                    ? 'bg-[#141311] border-[rgba(194,162,101,0.25)] text-[#FAF8F5] placeholder:text-stone-500'
-                    : 'bg-white border-[#DFD7CB] text-[#1C1A17] placeholder:text-stone-400'
-                }`}
-              />
+
+              {!oauthClientId && (
+                <p className="mb-2 text-[11px] text-amber-500 leading-relaxed">
+                  GOOGLE_OAUTH_CLIENT_ID is not configured on the backend — the speaker
+                  microphone is currently open to anyone with this link. Set it before the
+                  wedding.
+                </p>
+              )}
+
+              {oauthClientId && googleUser && (
+                <div
+                  className={`flex items-center justify-between gap-2 rounded-md border px-3 py-2 mb-2 transition-colors ${
+                    isDarkTheme
+                      ? 'bg-[#141311] border-[rgba(194,162,101,0.25)]'
+                      : 'bg-white border-[#DFD7CB]'
+                  }`}
+                >
+                  <div className="flex items-center gap-2 min-w-0">
+                    {googleUser.picture && (
+                      <img
+                        src={googleUser.picture}
+                        alt=""
+                        referrerPolicy="no-referrer"
+                        className="w-6 h-6 rounded-full flex-shrink-0"
+                      />
+                    )}
+                    <div className="min-w-0">
+                      <p
+                        className={`truncate text-xs font-semibold ${
+                          isDarkTheme ? 'text-[#FAF8F5]' : 'text-[#1C1A17]'
+                        }`}
+                      >
+                        {googleUser.name}
+                      </p>
+                      <p className="truncate text-[10px] text-stone-400">{googleUser.email}</p>
+                    </div>
+                  </div>
+                  <button
+                    onClick={handleSignOut}
+                    disabled={isStreaming}
+                    className={`flex-shrink-0 text-[10px] uppercase tracking-widest font-semibold px-2 py-1 rounded border transition-colors disabled:opacity-40 ${
+                      isDarkTheme
+                        ? 'border-[rgba(194,162,101,0.3)] text-stone-300 hover:bg-[#22201D]'
+                        : 'border-[#1C1A17]/25 text-stone-700 hover:bg-[#1C1A17] hover:text-[#FAF8F5]'
+                    }`}
+                  >
+                    Sign out
+                  </button>
+                </div>
+              )}
+
+              {/* GIS renders its own button here; kept mounted (hidden, not unmounted) so it
+                  doesn't need to be re-rendered every time sign-in state changes. */}
+              <div ref={googleButtonRef} className={googleUser ? 'hidden' : ''} />
             </div>
             <button
               onClick={toggleStreaming}
-              className={`w-full py-4 px-6 rounded-md font-sans uppercase tracking-[0.16em] text-xs font-bold flex items-center justify-center space-x-2.5 transition-all shadow-md ${
+              disabled={!isStreaming && !!oauthClientId && !idToken}
+              className={`w-full py-4 px-6 rounded-md font-sans uppercase tracking-[0.16em] text-xs font-bold flex items-center justify-center space-x-2.5 transition-all shadow-md disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:bg-none ${
                 isStreaming
                   ? 'bg-[#A6685B] hover:bg-[#8E554B] text-white shadow-[#A6685B]/20 animate-subtle-pulse'
                   : isDarkTheme
