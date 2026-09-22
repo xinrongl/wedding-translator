@@ -48,18 +48,23 @@ export const Header: React.FC<HeaderProps> = ({
 
   const isDark = isDarkProp !== undefined ? isDarkProp : (currentView === 'projector' && isProjectorDark);
 
+  // Guests on phones only need the brand + connection status; view switching,
+  // QR, theme and fullscreen are operator controls (theme/QR live in the guest toolbar).
+  const isGuestPhone = currentView === 'mobile';
+  const operatorOnly = isGuestPhone ? 'hidden sm:flex' : 'flex';
+
   return (
     <header
-      className={`sticky top-0 z-40 w-full transition-colors duration-500 border-b px-4 sm:px-8 py-3.5 flex items-center justify-between backdrop-blur-md ${
+      className={`sticky top-0 z-40 w-full transition-colors duration-500 border-b px-4 sm:px-8 h-16 sm:h-auto py-0 sm:py-3.5 flex items-center justify-between gap-3 backdrop-blur-md ${
         isDark
           ? 'bg-[#141312]/90 border-[rgba(194,162,101,0.2)] text-[#FAF8F5]'
           : 'bg-[#FAF8F5]/90 border-[#DFD7CB] text-[#1C1A17]'
       }`}
     >
       {/* Brand & Venue Signature Header */}
-      <div className="flex items-center space-x-3.5">
+      <div className="flex items-center space-x-3.5 min-w-0">
         <div
-          className={`w-10 h-10 rounded-full flex items-center justify-center border transition-all ${
+          className={`w-10 h-10 shrink-0 rounded-full flex items-center justify-center border transition-all ${
             isDark
               ? 'border-[#C2A265]/40 bg-[#1D1B18] text-[#C2A265]'
               : 'border-[#1C1A17]/20 bg-[#F5EFEB] text-[#1C1A17]'
@@ -67,9 +72,9 @@ export const Header: React.FC<HeaderProps> = ({
         >
           <span className="font-serif italic font-bold text-lg">S</span>
         </div>
-        <div>
+        <div className="min-w-0">
           <div className="flex items-center space-x-2">
-            <h1 className="font-serif tracking-[0.18em] text-xs sm:text-sm uppercase font-semibold">
+            <h1 className="font-serif tracking-[0.08em] sm:tracking-[0.18em] text-[11px] sm:text-sm uppercase font-semibold truncate">
               Stones of the Yarra Valley
             </h1>
             <span
@@ -83,11 +88,11 @@ export const Header: React.FC<HeaderProps> = ({
             </span>
           </div>
           <div className="text-[11px] tracking-wide flex items-center space-x-2 font-serif italic text-stone-500 dark:text-stone-400">
-            <span>
+            <span className="truncate">
               {wedding.bride_name} &amp; {wedding.groom_name}’s Wedding
             </span>
-            <span className="not-italic text-stone-400">•</span>
-            <span className="not-italic font-sans text-[10px] uppercase tracking-wider text-amber-600 dark:text-[#C2A265]">
+            <span className="hidden sm:inline not-italic text-stone-400">•</span>
+            <span className="hidden sm:inline not-italic font-sans text-[10px] uppercase tracking-wider text-amber-600 dark:text-[#C2A265]">
               Live Translation
             </span>
           </div>
@@ -96,7 +101,7 @@ export const Header: React.FC<HeaderProps> = ({
 
       {/* View Mode Navigation Tabs */}
       <nav
-        className={`flex items-center p-1 rounded-lg border transition-all shadow-sm ${
+        className={`${operatorOnly} items-center p-1 rounded-lg border transition-all shadow-sm ${
           isDark
             ? 'bg-[#1B1A18] border-[rgba(194,162,101,0.25)]'
             : 'bg-[#F2ECE3] border-[#DFD7CB]'
@@ -155,11 +160,11 @@ export const Header: React.FC<HeaderProps> = ({
       </nav>
 
       {/* Right Controls & Status Indicator */}
-      <div className="flex items-center space-x-2 sm:space-x-3">
+      <div className="flex items-center space-x-2 sm:space-x-3 shrink-0">
         {/* Guest QR Code Modal Trigger */}
         <button
           onClick={onOpenQrCode}
-          className={`flex items-center space-x-1.5 px-2.5 py-1.5 rounded-md border text-[11px] font-sans uppercase tracking-[0.14em] font-medium transition-all ${
+          className={`${operatorOnly} items-center space-x-1.5 px-2.5 py-1.5 rounded-md border text-[11px] font-sans uppercase tracking-[0.14em] font-medium transition-all ${
             isDark
               ? 'border-[rgba(194,162,101,0.3)] bg-[#1B1A18] text-[#DFCA9B] hover:bg-[#C2A265] hover:text-[#141311]'
               : 'border-[#1C1A17]/25 bg-[#FAF8F5] text-stone-800 hover:bg-[#1C1A17] hover:text-[#FAF8F5]'
@@ -203,7 +208,7 @@ export const Header: React.FC<HeaderProps> = ({
         {onToggleTheme && (
           <button
             onClick={onToggleTheme}
-            className={`p-2 rounded-md border transition-all ${
+            className={`${operatorOnly} p-2 rounded-md border transition-all ${
               isDark
                 ? 'border-[rgba(194,162,101,0.3)] bg-[#1B1A18] text-[#DFCA9B] hover:bg-[#C2A265] hover:text-[#141311]'
                 : 'border-[#1C1A17]/25 bg-[#FAF8F5] text-stone-700 hover:bg-[#1C1A17] hover:text-[#FAF8F5]'
@@ -217,7 +222,7 @@ export const Header: React.FC<HeaderProps> = ({
         {/* Fullscreen Button */}
         <button
           onClick={toggleFullscreen}
-          className={`p-2 rounded-md border transition-all ${
+          className={`${operatorOnly} p-2 rounded-md border transition-all ${
             isDark
               ? 'border-[rgba(194,162,101,0.3)] text-stone-300 hover:bg-[#C2A265] hover:text-[#141311]'
               : 'border-[#1C1A17]/25 text-stone-700 hover:bg-[#1C1A17] hover:text-[#FAF8F5]'

@@ -28,6 +28,24 @@ interface MobileViewProps {
   onOpenQrCode?: () => void;
 }
 
+const PREFS_KEY = 'stones_wedding_guest_prefs';
+
+function loadGuestPrefs(): { layoutMode: SubtitleLayoutMode; fontStyle: SubtitleFontStyle; fontSize: 'normal' | 'large' } {
+  const fallback = { layoutMode: 'stacked' as const, fontStyle: 'serif' as const, fontSize: 'normal' as const };
+  try {
+    const raw = localStorage.getItem(PREFS_KEY);
+    if (!raw) return fallback;
+    const saved = JSON.parse(raw);
+    return {
+      layoutMode: ['stacked', 'side-by-side', 'english'].includes(saved.layoutMode) ? saved.layoutMode : fallback.layoutMode,
+      fontStyle: ['serif', 'sans'].includes(saved.fontStyle) ? saved.fontStyle : fallback.fontStyle,
+      fontSize: ['normal', 'large'].includes(saved.fontSize) ? saved.fontSize : fallback.fontSize,
+    };
+  } catch {
+    return fallback;
+  }
+}
+
 export const MobileView: React.FC<MobileViewProps> = ({
   subtitles,
   activePartial,
@@ -36,19 +54,116 @@ export const MobileView: React.FC<MobileViewProps> = ({
   onToggleTheme,
   onOpenQrCode,
 }) => {
-  const [layoutMode, setLayoutMode] = useState<SubtitleLayoutMode>('stacked');
-  const [fontStyle, setFontStyle] = useState<SubtitleFontStyle>('serif');
-  const [fontSize, setFontSize] = useState<'normal' | 'large'>('normal');
+  const [layoutMode, setLayoutModeState] = useState<SubtitleLayoutMode>(() => loadGuestPrefs().layoutMode);
+  const [fontStyle, setFontStyleState] = useState<SubtitleFontStyle>(() => loadGuestPrefs().fontStyle);
+  const [fontSize, setFontSizeState] = useState<'normal' | 'large'>(() => loadGuestPrefs().fontSize);
   const [autoScroll, setAutoScroll] = useState(true);
   const [copied, setCopied] = useState(false);
 
+  // Remember the guest's reading preferences across reloads (e.g. reopening the
+  // page later in the reception) without touching the shared theme storage key.
+  const setLayoutMode = (mode: SubtitleLayoutMode) => {
+    setLayoutModeState(mode);
+    try {
+      localStorage.setItem(PREFS_KEY, JSON.stringify({ layoutMode: mode, fontStyle, fontSize }));
+    } catch {
+      // Private browsing or storage disabled — preference just won't persist.
+    }
+  };
+  const setFontStyle = (style: SubtitleFontStyle) => {
+    setFontStyleState(style);
+    try {
+      localStorage.setItem(PREFS_KEY, JSON.stringify({ layoutMode, fontStyle: style, fontSize }));
+    } catch {
+      // Private browsing or storage disabled — preference just won't persist.
+    }
+  };
+  const setFontSize = (size: 'normal' | 'large') => {
+    setFontSizeState(size);
+    try {
+      localStorage.setItem(PREFS_KEY, JSON.stringify({ layoutMode, fontStyle, fontSize: size }));
+    } catch {
+      // Private browsing or storage disabled — preference just won't persist.
+    }
+  };
+
+  // Keep the guest's screen awake while this view is open — ceremonies and
+  // speeches run long, and a locked screen would stop subtitles being read.
+  useEffect(() => {
+    if (!('wakeLock' in navigator)) return;
+    let sentinel: WakeLockSentinel | null = null;
+    let cancelled = false;
+
+    const requestLock = async () => {
+      try {
+        const lock = await navigator.wakeLock.request('screen');
+        if (cancelled) {
+          lock.release().catch(() => {});
+          return;
+        }
+        sentinel = lock;
+        // The browser also releases the lock on its own (e.g. tab backgrounded);
+        // clear our reference so handleVisibility knows to re-acquire it.
+        lock.addEventListener('release', () => {
+          if (sentinel === lock) sentinel = null;
+        });
+      } catch {
+        // Denied or unsupported in this context (e.g. low battery) — subtitles still work.
+      }
+    };
+
+    requestLock();
+
+    // The OS releases the lock whenever the tab is backgrounded, so re-acquire
+    // it when the guest switches back.
+    const handleVisibility = () => {
+      if (document.visibilityState === 'visible' && !sentinel) requestLock();
+    };
+    document.addEventListener('visibilitychange', handleVisibility);
+
+    return () => {
+      cancelled = true;
+      document.removeEventListener('visibilitychange', handleVisibility);
+      sentinel?.release().catch(() => {});
+    };
+  }, []);
+
   const bottomRef = useRef<HTMLDivElement>(null);
+
+  const isNearBottom = () => {
+    const el = bottomRef.current;
+    return !!el && el.getBoundingClientRect().bottom - window.innerHeight < 64;
+  };
 
   useEffect(() => {
     if (autoScroll && bottomRef.current) {
-      bottomRef.current.scrollIntoView({ behavior: 'smooth' });
+      bottomRef.current.scrollIntoView({ behavior: 'smooth', block: 'end' });
     }
   }, [subtitles, activePartial, autoScroll]);
+
+  // Stop following the live feed once the guest scrolls up to reread, and resume
+  // when they come back to the bottom. Pausing is driven by user gestures (not
+  // scroll events) so our own smooth-scroll animation can't trip it.
+  useEffect(() => {
+    const isVisible = () => !!bottomRef.current?.offsetParent;
+    const pauseIfAway = () => {
+      if (!isVisible()) return;
+      requestAnimationFrame(() => {
+        if (!isNearBottom()) setAutoScroll(false);
+      });
+    };
+    const resumeIfAtBottom = () => {
+      if (isVisible() && isNearBottom()) setAutoScroll(true);
+    };
+    window.addEventListener('wheel', pauseIfAway, { passive: true });
+    window.addEventListener('touchmove', pauseIfAway, { passive: true });
+    window.addEventListener('scroll', resumeIfAtBottom, { passive: true });
+    return () => {
+      window.removeEventListener('wheel', pauseIfAway);
+      window.removeEventListener('touchmove', pauseIfAway);
+      window.removeEventListener('scroll', resumeIfAtBottom);
+    };
+  }, []);
 
   const handleShare = async () => {
     const url = window.location.href;
@@ -71,12 +186,28 @@ export const MobileView: React.FC<MobileViewProps> = ({
   };
 
   const fontClass = fontStyle === 'serif' ? 'font-serif' : 'font-sans';
+  const zhSize = fontSize === 'large' ? 'text-lg sm:text-xl' : 'text-base sm:text-lg';
+  const enSize = fontSize === 'large' ? 'text-2xl sm:text-3xl' : 'text-lg sm:text-xl';
+
+  // 40px+ touch targets; :active (not :hover) so taps don't leave sticky hover states
+  const ctrlBase =
+    'h-10 min-w-10 px-2.5 inline-flex items-center justify-center gap-1.5 rounded-lg border text-[11px] font-sans uppercase tracking-wider font-semibold transition-colors active:scale-95';
+  const ctrlIdle = isDarkTheme
+    ? 'bg-[#22201D] border-[rgba(194,162,101,0.25)] text-stone-300 active:text-[#DFCA9B]'
+    : 'bg-[#F2ECE3] border-[#DFD7CB] text-stone-700 active:text-stone-900';
+  const ctrlActive = isDarkTheme
+    ? 'bg-[#C2A265] text-[#141311] border-[#C2A265]'
+    : 'bg-[#1C1A17] text-[#FAF8F5] border-[#1C1A17]';
+  const segBtn = (active: boolean) =>
+    `h-10 min-w-10 px-2.5 rounded-md items-center justify-center gap-1.5 text-[11px] font-sans uppercase tracking-wider font-semibold transition-colors ${
+      active ? ctrlActive : isDarkTheme ? 'text-stone-400' : 'text-stone-500'
+    }`;
 
   return (
-    <div className="max-w-2xl mx-auto min-h-[calc(100vh-65px)] flex flex-col justify-between p-4 sm:p-6 pb-20">
+    <div className="max-w-2xl mx-auto min-h-[calc(100dvh-4rem)] flex flex-col justify-between p-4 sm:p-6 pb-20">
       {/* Wedding Program Header Banner */}
       <div
-        className={`text-center py-4 sm:py-6 border-b mb-5 transition-colors ${
+        className={`text-center py-4 sm:py-6 border-b mb-4 transition-colors ${
           isDarkTheme ? 'border-[rgba(194,162,101,0.2)]' : 'border-[#DFD7CB]'
         }`}
       >
@@ -97,150 +228,103 @@ export const MobileView: React.FC<MobileViewProps> = ({
         >
           Live Simultaneous Ceremony &amp; Reception Interpretation
         </p>
+
+        {/* Invite other guests */}
+        <div className="mt-4 flex items-center justify-center gap-2">
+          <button onClick={handleShare} className={`${ctrlBase} ${ctrlIdle}`}>
+            {copied ? <Check className="w-4 h-4 text-emerald-500" /> : <Share2 className="w-4 h-4" />}
+            <span>{copied ? 'Link copied' : 'Share link'}</span>
+          </button>
+          {onOpenQrCode && (
+            <button onClick={onOpenQrCode} className={`${ctrlBase} ${ctrlIdle}`}>
+              <QrCode className="w-4 h-4" />
+              <span>QR code</span>
+            </button>
+          )}
+        </div>
       </div>
 
-      {/* Sticky Mobile Subheader with quick toggles */}
+      {/* Sticky reading controls (top-16 = header height) */}
       <div
-        className={`sticky top-16 z-20 backdrop-blur-md p-2.5 sm:p-3 rounded-xl border shadow-sm mb-5 flex flex-wrap items-center justify-between gap-2 transition-colors ${
+        className={`sticky top-16 z-20 backdrop-blur-md p-1.5 rounded-xl border shadow-sm mb-5 flex flex-wrap items-center justify-between gap-x-2 gap-y-1.5 transition-colors ${
           isDarkTheme
             ? 'bg-[#1B1A18]/92 border-[rgba(194,162,101,0.25)] text-stone-200'
             : 'bg-[#FAF8F5]/95 border-[#DFD7CB] text-stone-800'
         }`}
       >
-        <div className="flex items-center space-x-2">
+        <div className="flex items-center gap-2 pl-1.5">
           <div className="w-2 h-2 rounded-full bg-[#C2A265] animate-ping" />
           <span
-            className={`text-[11px] font-sans uppercase tracking-widest font-semibold transition-colors ${
+            className={`text-[11px] font-sans uppercase tracking-widest font-semibold ${
               isDarkTheme ? 'text-[#DFCA9B]' : 'text-stone-800'
             }`}
           >
-            Live Feed
+            Live
           </span>
         </div>
 
-        <div className="flex flex-wrap items-center space-x-1 sm:space-x-1.5">
-          {/* Layout Mode Selector: Stacked vs Side-by-Side vs English */}
+        <div className="flex items-center gap-1.5">
+          {/* Layout: Stacked / Split (sm+ only; identical to Stacked on phones) / English only */}
           <div
             className={`flex items-center p-0.5 rounded-lg border ${
               isDarkTheme ? 'bg-[#141312]/80 border-[rgba(194,162,101,0.2)]' : 'bg-stone-200/60 border-stone-300'
             }`}
+            role="group"
+            aria-label="Subtitle layout"
           >
             <button
               onClick={() => setLayoutMode('stacked')}
-              className={`p-1 sm:px-2 rounded text-[10px] font-sans uppercase tracking-wider font-semibold transition-all flex items-center space-x-1 ${
-                layoutMode === 'stacked'
-                  ? isDarkTheme
-                    ? 'bg-[#C2A265] text-[#141311] shadow-xs'
-                    : 'bg-[#1C1A17] text-[#FAF8F5] shadow-xs'
-                  : 'text-stone-400 hover:text-stone-200'
-              }`}
-              title="Stacked Subtitles"
+              className={`inline-flex ${segBtn(layoutMode === 'stacked')}`}
+              aria-label="Chinese and English"
+              title="Chinese and English"
             >
-              <Rows2 className="w-3.5 h-3.5" />
-              <span className="hidden xs:inline">Stacked</span>
+              <Rows2 className="w-4 h-4" />
+              <span className="hidden sm:inline">Stacked</span>
             </button>
             <button
               onClick={() => setLayoutMode('side-by-side')}
-              className={`p-1 sm:px-2 rounded text-[10px] font-sans uppercase tracking-wider font-semibold transition-all flex items-center space-x-1 ${
-                layoutMode === 'side-by-side'
-                  ? isDarkTheme
-                    ? 'bg-[#C2A265] text-[#141311] shadow-xs'
-                    : 'bg-[#1C1A17] text-[#FAF8F5] shadow-xs'
-                  : 'text-stone-400 hover:text-stone-200'
-              }`}
-              title="Side-by-Side View"
+              className={`hidden sm:inline-flex ${segBtn(layoutMode === 'side-by-side')}`}
+              aria-label="Side by side"
+              title="Side by side"
             >
-              <Columns2 className="w-3.5 h-3.5" />
-              <span className="hidden xs:inline">Split</span>
+              <Columns2 className="w-4 h-4" />
+              <span>Split</span>
             </button>
             <button
               onClick={() => setLayoutMode('english')}
-              className={`p-1 sm:px-2 rounded text-[10px] font-sans uppercase tracking-wider font-semibold transition-all flex items-center space-x-1 ${
-                layoutMode === 'english'
-                  ? isDarkTheme
-                    ? 'bg-[#C2A265] text-[#141311] shadow-xs'
-                    : 'bg-[#1C1A17] text-[#FAF8F5] shadow-xs'
-                  : 'text-stone-400 hover:text-stone-200'
-              }`}
-              title="English Translation Only"
+              className={`inline-flex ${segBtn(layoutMode === 'english')}`}
+              aria-label="English only"
+              title="English only"
             >
-              <Languages className="w-3.5 h-3.5" />
-              <span className="hidden xs:inline">EN</span>
+              <Languages className="w-4 h-4" />
+              <span className="hidden sm:inline">EN</span>
             </button>
           </div>
 
-          {/* Font style toggle */}
           <button
             onClick={() => setFontStyle(fontStyle === 'serif' ? 'sans' : 'serif')}
-            className={`p-1.5 px-2 rounded text-xs font-sans uppercase tracking-wider font-semibold border transition-all ${
-              fontStyle === 'sans'
-                ? isDarkTheme
-                  ? 'bg-[#C2A265]/20 text-[#DFCA9B] border-[#C2A265]/40'
-                  : 'bg-[#1C1A17] text-[#FAF8F5] border-[#1C1A17]'
-                : isDarkTheme
-                ? 'bg-[#22201D] border-[rgba(194,162,101,0.25)] text-stone-300 hover:text-[#DFCA9B]'
-                : 'bg-[#F2ECE3] border-[#DFD7CB] text-stone-600 hover:text-stone-900'
-            }`}
-            title={fontStyle === 'serif' ? 'Switch to Modern Sans font' : 'Switch to Romantic Serif font'}
+            className={`${ctrlBase} ${ctrlIdle}`}
+            aria-label={fontStyle === 'serif' ? 'Switch to sans-serif font' : 'Switch to serif font'}
           >
-            <span className="text-[10px] font-bold">{fontStyle === 'serif' ? 'Serif' : 'Sans'}</span>
+            {fontStyle === 'serif' ? 'Serif' : 'Sans'}
           </button>
 
-          {/* Font size toggle */}
           <button
             onClick={() => setFontSize(fontSize === 'normal' ? 'large' : 'normal')}
-            className={`p-1.5 px-2 rounded text-xs font-sans uppercase tracking-wider font-semibold border transition-all ${
-              fontSize === 'large'
-                ? 'bg-[#C2A265] text-[#141311] border-[#C2A265]'
-                : isDarkTheme
-                ? 'bg-[#22201D] border-[rgba(194,162,101,0.25)] text-stone-300 hover:text-[#DFCA9B]'
-                : 'bg-[#F2ECE3] border-[#DFD7CB] text-stone-600 hover:text-stone-900'
-            }`}
-            title="Toggle Font Size"
+            className={`${ctrlBase} ${fontSize === 'large' ? ctrlActive : ctrlIdle}`}
+            aria-label="Toggle larger text"
+            aria-pressed={fontSize === 'large'}
           >
-            <Type className="w-3.5 h-3.5" />
+            <Type className="w-4 h-4" />
           </button>
 
-          {/* Theme toggle */}
           {onToggleTheme && (
             <button
               onClick={onToggleTheme}
-              className={`p-1.5 px-2 rounded text-xs font-sans uppercase tracking-wider font-semibold border transition-all ${
-                isDarkTheme
-                  ? 'bg-[#22201D] border-[rgba(194,162,101,0.25)] text-[#DFCA9B] hover:bg-[#C2A265] hover:text-[#141311]'
-                  : 'bg-[#F2ECE3] border-[#DFD7CB] text-stone-700 hover:bg-[#1C1A17] hover:text-[#FAF8F5]'
-              }`}
-              title={isDarkTheme ? 'Switch to Daylight Theme' : 'Switch to Candlelight Theme'}
+              className={`${ctrlBase} ${ctrlIdle}`}
+              aria-label={isDarkTheme ? 'Switch to daylight theme' : 'Switch to candlelight theme'}
             >
-              {isDarkTheme ? <Sun className="w-3.5 h-3.5" /> : <Moon className="w-3.5 h-3.5 text-stone-700" />}
-            </button>
-          )}
-
-          {/* Share link */}
-          <button
-            onClick={handleShare}
-            className={`p-1.5 px-2 rounded text-xs font-sans uppercase tracking-wider font-semibold border transition-colors flex items-center space-x-1 ${
-              isDarkTheme
-                ? 'bg-[#22201D] border-[rgba(194,162,101,0.25)] text-stone-300 hover:text-[#DFCA9B]'
-                : 'bg-[#F2ECE3] border-[#DFD7CB] text-stone-700 hover:text-stone-900'
-            }`}
-            title="Share this page with table guests"
-          >
-            {copied ? <Check className="w-3.5 h-3.5 text-emerald-500" /> : <Share2 className="w-3.5 h-3.5" />}
-          </button>
-
-          {/* Show QR code modal */}
-          {onOpenQrCode && (
-            <button
-              onClick={onOpenQrCode}
-              className={`p-1.5 px-2 rounded text-xs font-sans uppercase tracking-wider font-semibold border transition-colors flex items-center space-x-1 ${
-                isDarkTheme
-                  ? 'bg-[#22201D] border-[rgba(194,162,101,0.25)] text-stone-300 hover:text-[#DFCA9B]'
-                  : 'bg-[#F2ECE3] border-[#DFD7CB] text-stone-700 hover:text-stone-900'
-              }`}
-              title="Show QR code for table guests"
-            >
-              <QrCode className="w-3.5 h-3.5" />
+              {isDarkTheme ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
             </button>
           )}
         </div>
@@ -285,7 +369,7 @@ export const MobileView: React.FC<MobileViewProps> = ({
                     : 'bg-[#FAF8F5] border-[#DFD7CB] hover:border-[#C2A265]/40'
                 }`}
               >
-                <div className="flex justify-between items-center text-[10px] text-stone-400 font-mono tracking-wider mb-2.5">
+                <div className="flex justify-between items-center text-[11px] text-stone-400 font-mono tracking-wider mb-2.5">
                   <span className="font-semibold text-stone-500">#{item.id}</span>
                   <span>{item.timestamp}</span>
                 </div>
@@ -297,7 +381,7 @@ export const MobileView: React.FC<MobileViewProps> = ({
                     <div className="sm:col-span-5 space-y-1">
                       <div className="flex items-center space-x-1.5">
                         <span
-                          className={`px-1.5 py-0.5 rounded text-[9px] font-sans font-bold tracking-wider uppercase border ${
+                          className={`px-1.5 py-0.5 rounded text-[11px] font-sans font-bold tracking-wider uppercase border ${
                             isDarkTheme
                               ? 'bg-stone-800/80 border-stone-700 text-stone-300'
                               : 'bg-stone-200 border-stone-300 text-stone-700'
@@ -305,14 +389,14 @@ export const MobileView: React.FC<MobileViewProps> = ({
                         >
                           ZH
                         </span>
-                        <span className="text-[10px] font-sans uppercase tracking-widest text-stone-400">
+                        <span className="text-[11px] font-sans uppercase tracking-widest text-stone-400">
                           Mandarin
                         </span>
                       </div>
                       <p
                         className={`font-sans leading-relaxed transition-colors ${
                           isDarkTheme ? 'text-stone-300' : 'text-stone-700'
-                        } ${fontSize === 'large' ? 'text-base sm:text-lg' : 'text-sm sm:text-base'}`}
+                        } ${zhSize}`}
                       >
                         {item.chinese || '—'}
                       </p>
@@ -325,10 +409,10 @@ export const MobileView: React.FC<MobileViewProps> = ({
                       }`}
                     >
                       <div className="flex items-center space-x-1.5">
-                        <span className="px-1.5 py-0.5 rounded text-[9px] font-sans font-bold tracking-wider uppercase bg-[#C2A265]/20 border border-[#C2A265]/40 text-[#DFCA9B]">
+                        <span className="px-1.5 py-0.5 rounded text-[11px] font-sans font-bold tracking-wider uppercase bg-[#C2A265]/20 border border-[#C2A265]/40 text-[#DFCA9B]">
                           EN
                         </span>
-                        <span className="text-[10px] font-sans uppercase tracking-widest text-[#C2A265]">
+                        <span className="text-[11px] font-sans uppercase tracking-widest text-[#C2A265]">
                           English
                         </span>
                       </div>
@@ -337,7 +421,7 @@ export const MobileView: React.FC<MobileViewProps> = ({
                           isDarkTheme
                             ? 'text-[#FAF8F5] drop-shadow-[0_1px_8px_rgba(223,202,155,0.18)]'
                             : 'text-[#1C1A17]'
-                        } ${fontSize === 'large' ? 'text-lg sm:text-xl' : 'text-base sm:text-lg'}`}
+                        } ${enSize}`}
                       >
                         {item.english}
                       </p>
@@ -350,7 +434,7 @@ export const MobileView: React.FC<MobileViewProps> = ({
                       <div className="space-y-1">
                         <div className="flex items-center space-x-1.5">
                           <span
-                            className={`px-1.5 py-0.5 rounded text-[9px] font-sans font-bold tracking-wider uppercase border ${
+                            className={`px-1.5 py-0.5 rounded text-[11px] font-sans font-bold tracking-wider uppercase border ${
                               isDarkTheme
                                 ? 'bg-stone-800/80 border-stone-700 text-stone-300'
                                 : 'bg-stone-200 border-stone-300 text-stone-700'
@@ -358,14 +442,14 @@ export const MobileView: React.FC<MobileViewProps> = ({
                           >
                             ZH
                           </span>
-                          <span className="text-[10px] font-sans uppercase tracking-widest text-stone-400">
+                          <span className="text-[11px] font-sans uppercase tracking-widest text-stone-400">
                             Spoken Mandarin
                           </span>
                         </div>
                         <p
                           className={`font-sans leading-relaxed transition-colors ${
                             isDarkTheme ? 'text-stone-300' : 'text-stone-700'
-                          } ${fontSize === 'large' ? 'text-base sm:text-lg' : 'text-sm sm:text-base'}`}
+                          } ${zhSize}`}
                         >
                           {item.chinese}
                         </p>
@@ -375,10 +459,10 @@ export const MobileView: React.FC<MobileViewProps> = ({
                     <div className="space-y-1">
                       {layoutMode !== 'english' && (
                         <div className="flex items-center space-x-1.5 pt-1">
-                          <span className="px-1.5 py-0.5 rounded text-[9px] font-sans font-bold tracking-wider uppercase bg-[#C2A265]/20 border border-[#C2A265]/40 text-[#DFCA9B]">
+                          <span className="px-1.5 py-0.5 rounded text-[11px] font-sans font-bold tracking-wider uppercase bg-[#C2A265]/20 border border-[#C2A265]/40 text-[#DFCA9B]">
                             EN
                           </span>
-                          <span className="text-[10px] font-sans uppercase tracking-widest text-[#C2A265]">
+                          <span className="text-[11px] font-sans uppercase tracking-widest text-[#C2A265]">
                             English Interpretation
                           </span>
                         </div>
@@ -388,7 +472,7 @@ export const MobileView: React.FC<MobileViewProps> = ({
                           isDarkTheme
                             ? 'text-[#FAF8F5] drop-shadow-[0_1px_8px_rgba(223,202,155,0.18)]'
                             : 'text-[#1C1A17]'
-                        } ${fontSize === 'large' ? 'text-lg sm:text-xl' : 'text-base sm:text-lg'}`}
+                        } ${enSize}`}
                       >
                         {item.english}
                       </p>
@@ -407,7 +491,7 @@ export const MobileView: React.FC<MobileViewProps> = ({
                     : 'bg-[#FFFDF9] border-[#C2A265]'
                 }`}
               >
-                <div className="flex justify-between items-center text-[10px] text-[#C2A265] font-sans tracking-widest uppercase font-bold mb-2.5">
+                <div className="flex justify-between items-center text-[11px] text-[#C2A265] font-sans tracking-widest uppercase font-bold mb-2.5">
                   <span className="flex items-center space-x-1.5">
                     <span className="w-2 h-2 rounded-full bg-[#C2A265] animate-ping" />
                     <span>Live Translation...</span>
@@ -421,7 +505,7 @@ export const MobileView: React.FC<MobileViewProps> = ({
                     <div className="sm:col-span-5 space-y-1">
                       <div className="flex items-center space-x-1.5">
                         <span
-                          className={`px-1.5 py-0.5 rounded text-[9px] font-sans font-bold tracking-wider uppercase border ${
+                          className={`px-1.5 py-0.5 rounded text-[11px] font-sans font-bold tracking-wider uppercase border ${
                             isDarkTheme
                               ? 'bg-stone-800/80 border-stone-700 text-stone-300'
                               : 'bg-stone-200 border-stone-300 text-stone-700'
@@ -429,14 +513,14 @@ export const MobileView: React.FC<MobileViewProps> = ({
                         >
                           ZH
                         </span>
-                        <span className="text-[10px] font-sans uppercase tracking-widest text-stone-400">
+                        <span className="text-[11px] font-sans uppercase tracking-widest text-stone-400">
                           Mandarin
                         </span>
                       </div>
                       <p
                         className={`font-sans leading-relaxed transition-colors ${
                           isDarkTheme ? 'text-stone-300' : 'text-stone-700'
-                        } ${fontSize === 'large' ? 'text-base sm:text-lg' : 'text-sm sm:text-base'}`}
+                        } ${zhSize}`}
                       >
                         {activePartial.chinese || 'Listening...'}
                       </p>
@@ -448,10 +532,10 @@ export const MobileView: React.FC<MobileViewProps> = ({
                       }`}
                     >
                       <div className="flex items-center space-x-1.5">
-                        <span className="px-1.5 py-0.5 rounded text-[9px] font-sans font-bold tracking-wider uppercase bg-[#C2A265]/20 border border-[#C2A265]/40 text-[#DFCA9B]">
+                        <span className="px-1.5 py-0.5 rounded text-[11px] font-sans font-bold tracking-wider uppercase bg-[#C2A265]/20 border border-[#C2A265]/40 text-[#DFCA9B]">
                           EN
                         </span>
-                        <span className="text-[10px] font-sans uppercase tracking-widest text-[#C2A265]">
+                        <span className="text-[11px] font-sans uppercase tracking-widest text-[#C2A265]">
                           English
                         </span>
                       </div>
@@ -460,7 +544,7 @@ export const MobileView: React.FC<MobileViewProps> = ({
                           isDarkTheme
                             ? 'text-[#FAF8F5] drop-shadow-[0_1px_8px_rgba(223,202,155,0.22)]'
                             : 'text-[#1C1A17]'
-                        } ${fontSize === 'large' ? 'text-lg sm:text-xl' : 'text-base sm:text-lg'}`}
+                        } ${enSize}`}
                       >
                         <span>{activePartial.english}</span>
                         <span className="inline-block w-1.5 h-4 ml-1.5 bg-[#C2A265] animate-pulse align-middle" />
@@ -474,7 +558,7 @@ export const MobileView: React.FC<MobileViewProps> = ({
                       <div className="space-y-1">
                         <div className="flex items-center space-x-1.5">
                           <span
-                            className={`px-1.5 py-0.5 rounded text-[9px] font-sans font-bold tracking-wider uppercase border ${
+                            className={`px-1.5 py-0.5 rounded text-[11px] font-sans font-bold tracking-wider uppercase border ${
                               isDarkTheme
                                 ? 'bg-stone-800/80 border-stone-700 text-stone-300'
                                 : 'bg-stone-200 border-stone-300 text-stone-700'
@@ -482,14 +566,14 @@ export const MobileView: React.FC<MobileViewProps> = ({
                           >
                             ZH
                           </span>
-                          <span className="text-[10px] font-sans uppercase tracking-widest text-stone-400">
+                          <span className="text-[11px] font-sans uppercase tracking-widest text-stone-400">
                             Spoken Mandarin
                           </span>
                         </div>
                         <p
                           className={`font-sans leading-relaxed transition-colors ${
                             isDarkTheme ? 'text-stone-300' : 'text-stone-700'
-                          } ${fontSize === 'large' ? 'text-base sm:text-lg' : 'text-sm sm:text-base'}`}
+                          } ${zhSize}`}
                         >
                           {activePartial.chinese}
                         </p>
@@ -499,10 +583,10 @@ export const MobileView: React.FC<MobileViewProps> = ({
                     <div className="space-y-1">
                       {layoutMode !== 'english' && (
                         <div className="flex items-center space-x-1.5 pt-1">
-                          <span className="px-1.5 py-0.5 rounded text-[9px] font-sans font-bold tracking-wider uppercase bg-[#C2A265]/20 border border-[#C2A265]/40 text-[#DFCA9B]">
+                          <span className="px-1.5 py-0.5 rounded text-[11px] font-sans font-bold tracking-wider uppercase bg-[#C2A265]/20 border border-[#C2A265]/40 text-[#DFCA9B]">
                             EN
                           </span>
-                          <span className="text-[10px] font-sans uppercase tracking-widest text-[#C2A265]">
+                          <span className="text-[11px] font-sans uppercase tracking-widest text-[#C2A265]">
                             English Interpretation
                           </span>
                         </div>
@@ -512,7 +596,7 @@ export const MobileView: React.FC<MobileViewProps> = ({
                           isDarkTheme
                             ? 'text-[#FAF8F5] drop-shadow-[0_1px_8px_rgba(223,202,155,0.22)]'
                             : 'text-[#1C1A17]'
-                        } ${fontSize === 'large' ? 'text-lg sm:text-xl' : 'text-base sm:text-lg'}`}
+                        } ${enSize}`}
                       >
                         <span>{activePartial.english}</span>
                         <span className="inline-block w-1.5 h-4 ml-1.5 bg-[#C2A265] animate-pulse align-middle" />
@@ -524,7 +608,7 @@ export const MobileView: React.FC<MobileViewProps> = ({
             )}
           </>
         )}
-        <div ref={bottomRef} />
+        <div ref={bottomRef} className="scroll-mb-6" />
       </div>
 
       {/* Program Footer */}
@@ -537,7 +621,7 @@ export const MobileView: React.FC<MobileViewProps> = ({
           Stones of the Yarra Valley • The Stable
         </p>
         <p
-          className={`font-sans text-[10px] uppercase tracking-widest ${
+          className={`font-sans text-[11px] uppercase tracking-widest ${
             isDarkTheme ? 'text-stone-500' : 'text-stone-400'
           }`}
         >
@@ -552,10 +636,10 @@ export const MobileView: React.FC<MobileViewProps> = ({
             setAutoScroll(true);
             bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
           }}
-          className={`fixed bottom-6 right-6 z-30 p-3 px-4 rounded-full shadow-xl flex items-center space-x-2 text-xs font-sans uppercase tracking-widest font-semibold transition-all animate-bounce ${
+          className={`fixed bottom-[calc(1.5rem+env(safe-area-inset-bottom))] right-4 z-30 h-12 px-5 rounded-full shadow-xl flex items-center gap-2 text-xs font-sans uppercase tracking-widest font-semibold transition-all active:scale-95 ${
             isDarkTheme
-              ? 'bg-[#C2A265] text-[#141311] hover:bg-[#D4BC88]'
-              : 'bg-[#1C1A17] text-[#FAF8F5] hover:bg-stone-800'
+              ? 'bg-[#C2A265] text-[#141311]'
+              : 'bg-[#1C1A17] text-[#FAF8F5]'
           }`}
         >
           <ArrowDown className="w-4 h-4" />
