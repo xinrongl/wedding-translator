@@ -1,0 +1,442 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Seating Chart</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,500;1,300;1,400&family=Jost:wght@300;400;500&family=Pinyon+Script&display=swap">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+<style id="page-size">@page { size: 420mm 594mm; margin: 0; }</style>
+<style>
+:root {
+  /* Poster palette — taken from the venue: black ink on white, vineyard olive */
+  --paper: #FCFCFA;
+  --ink: #1D1D1B;
+  --muted: #8B897F;
+  --rule: #CFCBC0;
+  --vine: #6B705B;
+
+  /* Editor chrome */
+  --ui-bg: #EEEDE8;
+  --ui-panel: #FFFFFF;
+  --ui-line: #E0DDD5;
+  --ui-text: #2A2925;
+  --ui-sub: #7A776D;
+  --ui-focus: #6B705B;
+  --danger: #9E4A3C;
+
+  --serif: "Cormorant Garamond", "Adobe Garamond Pro", Garamond, Georgia, serif;
+  --sans: "Jost", "Helvetica Neue", Arial, sans-serif;
+  --script: "Pinyon Script", "Snell Roundhand", "Apple Chancery", cursive;
+}
+* { box-sizing: border-box; }
+html, body { height: 100%; margin: 0; }
+body { background: var(--ui-bg); color: var(--ui-text); font: 400 14px/1.45 var(--sans); }
+
+/* ---------- App layout ---------- */
+.app { display: grid; grid-template-columns: 400px 1fr; height: 100%; }
+.panel { background: var(--ui-panel); border-right: 1px solid var(--ui-line); overflow-y: auto; padding: 28px 24px 40px; }
+.panel h1 { font: 300 italic 30px/1 var(--serif); margin: 0 0 4px; }
+.panel .lede { color: var(--ui-sub); margin: 0 0 28px; font-size: 13px; }
+.section-label { font: 500 11px/1 var(--sans); letter-spacing: .18em; text-transform: uppercase; color: var(--ui-sub); margin: 28px 0 12px; }
+
+.field { display: grid; gap: 4px; margin-bottom: 12px; }
+.field label { font-size: 12px; color: var(--ui-sub); }
+input[type="text"], input[type="number"], select {
+  font: inherit; color: var(--ui-text); background: var(--ui-panel);
+  border: 1px solid var(--ui-line); border-radius: 4px; padding: 7px 9px; width: 100%;
+}
+input:focus-visible, select:focus-visible, button:focus-visible { outline: 2px solid var(--ui-focus); outline-offset: 1px; }
+input[type="number"] { -moz-appearance: textfield; }
+input[type="number"]::-webkit-inner-spin-button { opacity: .4; }
+
+.t-card { border: 1px solid var(--ui-line); border-radius: 6px; padding: 14px; margin-bottom: 14px; }
+.t-head { display: flex; align-items: center; gap: 8px; margin-bottom: 12px; }
+.t-head label { font: 500 12px var(--sans); letter-spacing: .14em; text-transform: uppercase; }
+.t-head input { width: 72px; }
+.t-head .count { color: var(--ui-sub); font-size: 12px; margin-left: auto; }
+.g-cols { display: grid; grid-template-columns: 60px 1fr 28px; gap: 6px; font-size: 11px; color: var(--ui-sub); margin-bottom: 4px; }
+.g-row { display: grid; grid-template-columns: 60px 1fr 28px; gap: 6px; margin-bottom: 6px; }
+.g-row.dup input[type="number"] { border-color: var(--danger); color: var(--danger); }
+.dup-note { color: var(--danger); font-size: 12px; margin: 2px 0 8px; }
+
+button { font: inherit; cursor: pointer; }
+.icon-btn { border: 0; background: none; color: var(--ui-sub); border-radius: 4px; font-size: 18px; line-height: 1; }
+.icon-btn:hover { color: var(--danger); background: #F5EFEC; }
+.link-btn { border: 0; background: none; color: var(--vine); padding: 4px 0; font-weight: 500; }
+.link-btn:hover { text-decoration: underline; }
+.link-btn.danger { color: var(--danger); }
+.t-foot { display: flex; justify-content: space-between; margin-top: 4px; }
+.add-table { width: 100%; border: 1px dashed var(--rule); background: none; border-radius: 6px; padding: 12px; color: var(--ui-text); }
+.add-table:hover { border-color: var(--vine); color: var(--vine); }
+
+/* ---------- Preview ---------- */
+.preview { display: flex; flex-direction: column; min-width: 0; min-height: 0; }
+.toolbar { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; padding: 14px 24px; border-bottom: 1px solid var(--ui-line); background: var(--ui-panel); }
+.toolbar select { width: auto; }
+.toolbar .spacer { flex: 1; }
+.btn { border: 1px solid var(--ink); background: var(--ui-panel); color: var(--ink); border-radius: 4px; padding: 8px 14px; letter-spacing: .04em; }
+.btn.primary { background: var(--ink); color: var(--paper); }
+.btn:disabled { opacity: .5; cursor: progress; }
+.status { font-size: 12px; color: var(--ui-sub); }
+.stage { flex: 1; min-height: 0; display: grid; place-items: center; padding: 32px; overflow: hidden; }
+.frame { box-shadow: 0 1px 2px rgba(0,0,0,.06), 0 12px 40px rgba(40,38,30,.12); }
+.frame .poster { transform-origin: top left; }
+
+/* ---------- Poster (designed at 1000px width, scaled for preview/print/export) ---------- */
+.poster {
+  width: 1000px; background: var(--paper); color: var(--ink);
+  display: flex; flex-direction: column; overflow: hidden;
+  padding: 96px 84px 72px;
+  -webkit-print-color-adjust: exact; print-color-adjust: exact;
+  --fit: 1; --hs: 1;
+}
+.poster.landscape { padding: 56px 72px 48px; --hs: .8; }
+.p-head { text-align: center; }
+.p-eyebrow, .p-meta { font: 400 calc(13px * var(--hs))/1.4 var(--sans); letter-spacing: .34em; text-transform: uppercase; color: var(--muted); margin: 0; }
+.p-names { font: 300 italic calc(80px * var(--hs))/1.05 var(--serif); margin: calc(22px * var(--hs)) 0 calc(20px * var(--hs)); letter-spacing: .005em; text-wrap: balance; }
+.p-divider { width: 56px; height: 1px; background: var(--rule); margin: calc(40px * var(--hs)) auto calc(30px * var(--hs)); }
+.p-script { font: 400 calc(56px * var(--hs))/1.2 var(--script); color: var(--vine); margin: 0; }
+
+.p-tables {
+  flex: 1; min-height: 0; overflow: hidden;
+  display: grid; grid-template-columns: repeat(var(--cols, 3), 1fr);
+  gap: calc(48px * var(--fit)) 48px; align-content: safe center;
+  margin-top: calc(56px * var(--hs));
+}
+.p-table { text-align: center; min-width: 0; }
+.p-t-label { font: 400 calc(11px * var(--fit))/1 var(--sans); letter-spacing: .42em; text-transform: uppercase; color: var(--muted); margin: 0 0 0 .42em; }
+.p-t-num { font: 300 calc(68px * var(--fit))/1 var(--serif); margin: calc(8px * var(--fit)) 0 calc(16px * var(--fit)); font-variant-numeric: lining-nums; }
+.p-t-rule { width: 28px; height: 1px; background: var(--ink); margin: 0 auto calc(20px * var(--fit)); }
+.p-guests { list-style: none; margin: 0 auto; padding: 0; display: inline-grid; grid-template-columns: auto auto; column-gap: calc(14px * var(--fit)); text-align: left; max-width: 100%; }
+.p-guests li { display: contents; }
+.p-seat { font: 400 calc(11px * var(--fit))/1 var(--sans); color: var(--muted); text-align: right; font-variant-numeric: tabular-nums; align-self: baseline; letter-spacing: .06em; }
+.p-name { font: 400 calc(24px * var(--fit))/1.2 var(--serif); padding: calc(6px * var(--fit)) 0; align-self: baseline; overflow-wrap: anywhere; }
+.p-empty { color: var(--rule); font-style: italic; }
+
+/* ---------- Print & export hosts ---------- */
+#export-host { position: absolute; left: -12000px; top: 0; }
+#print-host { display: none; }
+@media print {
+  html, body { background: var(--paper); height: auto; }
+  .app, #export-host { display: none !important; }
+  #print-host { display: block; }
+  #print-host .poster { break-inside: avoid; }
+}
+
+/* ---------- Narrow screens ---------- */
+@media (max-width: 860px) {
+  .app { grid-template-columns: 1fr; grid-template-rows: auto auto; height: auto; }
+  .panel { border-right: 0; border-bottom: 1px solid var(--ui-line); overflow: visible; padding-inline: 16px; }
+  .toolbar { padding-inline: 16px; }
+  .stage { padding: 20px 16px; min-height: 70vh; }
+}
+@media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
+</style>
+</head>
+<body>
+
+<div class="app">
+  <aside class="panel">
+    <h1>Seating Chart</h1>
+    <p class="lede">Edit on the left — the chart updates as you type. Changes are saved in this browser.</p>
+
+    <div class="section-label">Heading</div>
+    <div class="field"><label for="f-eyebrow">Top line</label><input id="f-eyebrow" type="text" data-key="eyebrow"></div>
+    <div class="field"><label for="f-names">Couple</label><input id="f-names" type="text" data-key="names"></div>
+    <div class="field"><label for="f-meta">Date &amp; venue</label><input id="f-meta" type="text" data-key="meta"></div>
+    <div class="field"><label for="f-script">Script line</label><input id="f-script" type="text" data-key="script"></div>
+
+    <div class="section-label">Tables</div>
+    <div id="tables-editor"></div>
+    <button class="add-table" id="add-table" type="button">+ Add table</button>
+  </aside>
+
+  <main class="preview">
+    <div class="toolbar">
+      <label for="f-paper" class="status">Paper</label>
+      <select id="f-paper">
+        <option value="A4">A4</option>
+        <option value="A3">A3</option>
+        <option value="A2">A2</option>
+        <option value="A1">A1</option>
+      </select>
+      <select id="f-orient" aria-label="Orientation">
+        <option value="portrait">Portrait</option>
+        <option value="landscape">Landscape</option>
+      </select>
+      <span class="spacer"></span>
+      <span class="status" id="status"></span>
+      <select id="f-dpi" aria-label="Image resolution">
+        <option value="300">300 dpi</option>
+        <option value="150">150 dpi</option>
+      </select>
+      <button class="btn" id="btn-png" type="button">Download PNG</button>
+      <button class="btn primary" id="btn-pdf" type="button">Save as PDF</button>
+    </div>
+    <div class="stage" id="stage">
+      <div class="frame" id="frame"><div class="poster" id="poster"></div></div>
+    </div>
+  </main>
+</div>
+
+<div id="export-host"></div>
+<div id="print-host"></div>
+
+<script>
+(() => {
+  const PAPER = { A4: [210, 297], A3: [297, 420], A2: [420, 594], A1: [594, 841] };
+  const BASE_W = 1000;
+  const STORE = 'wedding-seating-chart-v1';
+
+  let uid = 0;
+  const id = () => 'x' + (++uid) + Date.now().toString(36);
+  const sample = (n, names) => ({ id: id(), number: n, guests: names.map((name, i) => ({ id: id(), seat: i + 1, name })) });
+
+  const DEFAULT = {
+    eyebrow: 'The wedding of',
+    names: 'Olivia & Thomas',
+    meta: 'Saturday 14 March 2027 · Stones of the Yarra Valley',
+    script: 'Please find your seat',
+    paper: 'A2', orient: 'portrait', dpi: '300',
+    tables: [
+      sample(1, ['Margaret Allen', 'Robert Allen', 'Sophie Chen', 'Daniel Chen', 'Grace Wilson', 'Henry Wilson', 'Isla Murray', 'Oscar Murray']),
+      sample(2, ['Charlotte Hughes', 'William Hughes', 'Amelia Park', 'Lucas Park', 'Ruby Taylor', 'Jack Taylor', 'Chloe Martin', 'Ethan Martin']),
+      sample(3, ['Harper Evans', 'Noah Evans', 'Zoe Walker', 'Leo Walker', 'Mia Scott', 'Liam Scott', 'Ella King', 'Max King']),
+    ],
+  };
+
+  let state;
+  try { state = JSON.parse(localStorage.getItem(STORE)) || structuredClone(DEFAULT); }
+  catch { state = structuredClone(DEFAULT); }
+  const save = () => { try { localStorage.setItem(STORE, JSON.stringify(state)); } catch {} };
+
+  const $ = (s) => document.querySelector(s);
+  const esc = (s) => String(s ?? '').replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+  const sortedGuests = (t) => [...t.guests].sort((a, b) => {
+    const sa = a.seat === '' || a.seat == null ? Infinity : +a.seat;
+    const sb = b.seat === '' || b.seat == null ? Infinity : +b.seat;
+    return sa - sb;
+  });
+  const dupSeats = (t) => {
+    const seen = new Map();
+    t.guests.forEach((g) => { if (g.seat !== '' && g.seat != null) seen.set(+g.seat, (seen.get(+g.seat) || 0) + 1); });
+    return new Set([...seen].filter(([, c]) => c > 1).map(([s]) => s));
+  };
+  const nextNum = (arr) => arr.reduce((m, v) => Math.max(m, +v || 0), 0) + 1;
+
+  // ---------- Editor ----------
+  document.querySelectorAll('[data-key]').forEach((el) => {
+    el.value = state[el.dataset.key] ?? '';
+    el.addEventListener('input', () => { state[el.dataset.key] = el.value; changed(); });
+  });
+  for (const k of ['paper', 'orient', 'dpi']) {
+    const el = $('#f-' + k);
+    el.value = state[k];
+    el.addEventListener('change', () => { state[k] = el.value; changed(); });
+  }
+
+  function renderEditor() {
+    $('#tables-editor').innerHTML = state.tables.map((t) => {
+      const dups = dupSeats(t);
+      return `
+      <div class="t-card" data-t="${t.id}">
+        <div class="t-head">
+          <label for="tn-${t.id}">Table</label>
+          <input id="tn-${t.id}" type="number" min="0" value="${esc(t.number)}" data-act="tnum">
+          <span class="count">${t.guests.length} guest${t.guests.length === 1 ? '' : 's'}</span>
+        </div>
+        <div class="g-cols"><span>Seat</span><span>Guest name</span><span></span></div>
+        ${t.guests.map((g) => `
+          <div class="g-row${dups.has(+g.seat) ? ' dup' : ''}" data-g="${g.id}">
+            <input id="gs-${g.id}" type="number" min="1" value="${esc(g.seat)}" data-act="seat" aria-label="Seat number">
+            <input id="gn-${g.id}" type="text" value="${esc(g.name)}" data-act="name" aria-label="Guest name" placeholder="Guest name">
+            <button class="icon-btn" type="button" data-act="del-guest" aria-label="Remove guest">×</button>
+          </div>`).join('')}
+        ${dups.size ? `<p class="dup-note">Seat ${[...dups].join(', ')} is used more than once.</p>` : ''}
+        <div class="t-foot">
+          <button class="link-btn" type="button" data-act="add-guest">+ Add guest</button>
+          <button class="link-btn danger" type="button" data-act="del-table">Remove table</button>
+        </div>
+      </div>`;
+    }).join('');
+  }
+
+  const findT = (el) => state.tables.find((t) => t.id === el.closest('[data-t]')?.dataset.t);
+  const findG = (el, t) => t.guests.find((g) => g.id === el.closest('[data-g]')?.dataset.g);
+
+  $('#tables-editor').addEventListener('input', (e) => {
+    const act = e.target.dataset.act, t = findT(e.target);
+    if (!t) return;
+    if (act === 'tnum') t.number = e.target.value;
+    if (act === 'seat' || act === 'name') {
+      const g = findG(e.target, t);
+      g[act] = act === 'seat' ? (e.target.value === '' ? '' : +e.target.value) : e.target.value;
+      if (act === 'seat') refreshDupHints(t);
+    }
+    changed();
+  });
+
+  // Update duplicate-seat markers without rebuilding (keeps focus in the field).
+  function refreshDupHints(t) {
+    const card = document.querySelector(`[data-t="${t.id}"]`);
+    const dups = dupSeats(t);
+    card.querySelectorAll('.g-row').forEach((row) => {
+      const g = t.guests.find((x) => x.id === row.dataset.g);
+      row.classList.toggle('dup', dups.has(+g.seat));
+    });
+    let note = card.querySelector('.dup-note');
+    if (dups.size) {
+      if (!note) { note = document.createElement('p'); note.className = 'dup-note'; card.querySelector('.t-foot').before(note); }
+      note.textContent = `Seat ${[...dups].join(', ')} is used more than once.`;
+    } else note?.remove();
+  }
+
+  let pendingDelete = null;
+  $('#tables-editor').addEventListener('click', (e) => {
+    const btn = e.target.closest('button'); if (!btn) return;
+    const t = findT(btn), act = btn.dataset.act;
+    if (act === 'add-guest') {
+      const g = { id: id(), seat: nextNum(t.guests.map((x) => x.seat)), name: '' };
+      t.guests.push(g); renderEditor(); changed();
+      document.getElementById('gn-' + g.id)?.focus();
+    } else if (act === 'del-guest') {
+      t.guests = t.guests.filter((g) => g !== findG(btn, t)); renderEditor(); changed();
+    } else if (act === 'del-table') {
+      if (pendingDelete !== t.id) {
+        pendingDelete = t.id; btn.textContent = 'Click again to remove';
+        setTimeout(() => { if (pendingDelete === t.id) { pendingDelete = null; btn.textContent = 'Remove table'; } }, 3000);
+        return;
+      }
+      pendingDelete = null;
+      state.tables = state.tables.filter((x) => x !== t); renderEditor(); changed();
+    }
+  });
+
+  $('#add-table').addEventListener('click', () => {
+    const t = { id: id(), number: nextNum(state.tables.map((x) => x.number)), guests: [{ id: id(), seat: 1, name: '' }] };
+    state.tables.push(t); renderEditor(); changed();
+    document.getElementById('gn-' + t.guests[0].id)?.focus();
+  });
+
+  // ---------- Poster ----------
+  const dims = () => { const [w, h] = PAPER[state.paper]; return state.orient === 'landscape' ? [h, w] : [w, h]; };
+  const posterH = () => { const [w, h] = dims(); return Math.round(BASE_W * h / w); };
+
+  function renderPoster() {
+    const p = $('#poster');
+    const n = state.tables.length;
+    const cols = state.orient === 'landscape' ? Math.min(n, 4) : Math.min(n, 3);
+    p.className = 'poster' + (state.orient === 'landscape' ? ' landscape' : '');
+    p.style.height = posterH() + 'px';
+    p.style.setProperty('--cols', Math.max(cols, 1));
+    p.innerHTML = `
+      <header class="p-head">
+        ${state.eyebrow ? `<p class="p-eyebrow">${esc(state.eyebrow)}</p>` : ''}
+        ${state.names ? `<h2 class="p-names">${esc(state.names)}</h2>` : ''}
+        ${state.meta ? `<p class="p-meta">${esc(state.meta)}</p>` : ''}
+        <div class="p-divider"></div>
+        ${state.script ? `<p class="p-script">${esc(state.script)}</p>` : ''}
+      </header>
+      <section class="p-tables">
+        ${state.tables.map((t) => `
+          <div class="p-table">
+            <p class="p-t-label">Table</p>
+            <div class="p-t-num">${esc(t.number)}</div>
+            <div class="p-t-rule"></div>
+            <ul class="p-guests">
+              ${sortedGuests(t).map((g) => `<li><span class="p-seat">${esc(g.seat)}</span><span class="p-name${g.name ? '' : ' p-empty'}">${g.name ? esc(g.name) : '—'}</span></li>`).join('')}
+            </ul>
+          </div>`).join('')}
+      </section>`;
+    fitText(p);
+  }
+
+  // Shrink the table text until every guest fits on the page.
+  function fitText(p) {
+    const area = p.querySelector('.p-tables');
+    let fit = 1.4;
+    p.style.setProperty('--fit', fit);
+    while (fit > 0.4 && (area.scrollHeight > area.clientHeight + 1 || area.scrollWidth > area.clientWidth + 1)) {
+      fit = +(fit - 0.03).toFixed(2);
+      p.style.setProperty('--fit', fit);
+    }
+    const tight = fit <= 0.4 && area.scrollHeight > area.clientHeight + 1;
+    $('#status').textContent = tight ? 'Too many guests for this paper — try a larger size.' : '';
+  }
+
+  function scalePreview() {
+    const stage = $('#stage'), frame = $('#frame'), p = $('#poster');
+    const cs = getComputedStyle(stage);
+    const aw = stage.clientWidth - parseFloat(cs.paddingLeft) - parseFloat(cs.paddingRight);
+    const ah = stage.clientHeight - parseFloat(cs.paddingTop) - parseFloat(cs.paddingBottom);
+    const h = posterH();
+    const s = Math.min(aw / BASE_W, (ah > 100 ? ah : Infinity) / h, 1);
+    p.style.transform = `scale(${s})`;
+    frame.style.width = BASE_W * s + 'px';
+    frame.style.height = h * s + 'px';
+  }
+
+  function changed() {
+    save();
+    const [w, h] = dims();
+    $('#page-size').textContent = `@page { size: ${w}mm ${h}mm; margin: 0; }`;
+    renderPoster();
+    scalePreview();
+  }
+
+  // ---------- Export ----------
+  function cleanClone() {
+    const c = $('#poster').cloneNode(true);
+    c.removeAttribute('id');
+    c.style.transform = 'none';
+    return c;
+  }
+
+  $('#btn-png').addEventListener('click', async (e) => {
+    const btn = e.currentTarget;
+    btn.disabled = true; btn.textContent = 'Rendering…';
+    try {
+      await document.fonts.ready;
+      const host = $('#export-host');
+      host.replaceChildren(cleanClone());
+      const [wmm] = dims();
+      const scale = (wmm / 25.4 * +state.dpi) / BASE_W;
+      const canvas = await html2canvas(host.firstChild, { scale, backgroundColor: getComputedStyle(document.documentElement).getPropertyValue('--paper').trim(), logging: false });
+      host.replaceChildren();
+      const blob = await new Promise((r) => canvas.toBlob(r, 'image/png'));
+      if (!blob) throw new Error('canvas too large');
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(blob);
+      a.download = `seating-chart-${state.paper}-${state.orient}-${state.dpi}dpi.png`;
+      a.click();
+      setTimeout(() => URL.revokeObjectURL(a.href), 5000);
+      $('#status').textContent = `Saved ${canvas.width} × ${canvas.height} px PNG.`;
+    } catch (err) {
+      $('#status').textContent = 'This browser could not render an image that large — choose 150 dpi or a smaller paper size, or use Save as PDF.';
+    } finally {
+      btn.disabled = false; btn.textContent = 'Download PNG';
+    }
+  });
+
+  // PDF via the browser's print dialog: text stays vector, so it is sharp at any size.
+  function preparePrint() {
+    const [wmm] = dims();
+    const c = cleanClone();
+    c.style.zoom = (wmm / 25.4 * 96) / BASE_W;
+    c.style.height = (posterH() - 2) + 'px';
+    $('#print-host').replaceChildren(c);
+  }
+  window.addEventListener('beforeprint', preparePrint);
+  $('#btn-pdf').addEventListener('click', () => { preparePrint(); window.print(); });
+
+  window.addEventListener('resize', scalePreview);
+  renderEditor();
+  changed();
+  document.fonts.ready.then(() => { renderPoster(); scalePreview(); });
+})();
+</script>
+</body>
+</html>
