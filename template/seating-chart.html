@@ -102,7 +102,7 @@ button { font: inherit; cursor: pointer; }
 
 .p-tables {
   flex: 1; min-height: 0; overflow: hidden;
-  display: grid; grid-template-columns: repeat(var(--cols, 3), 1fr);
+  display: grid; grid-template-columns: repeat(var(--cols, 3), auto); justify-content: space-evenly;
   gap: calc(48px * var(--fit)) 48px; align-content: safe center;
   margin-top: calc(56px * var(--hs));
 }
@@ -113,7 +113,7 @@ button { font: inherit; cursor: pointer; }
 .p-guests { list-style: none; margin: 0 auto; padding: 0; display: inline-grid; grid-template-columns: auto auto; column-gap: calc(14px * var(--fit)); text-align: left; max-width: 100%; }
 .p-guests li { display: contents; }
 .p-seat { font: 400 calc(11px * var(--fit))/1 var(--sans); color: var(--muted); text-align: right; font-variant-numeric: tabular-nums; align-self: baseline; letter-spacing: .06em; }
-.p-name { font: 400 calc(24px * var(--fit))/1.2 var(--serif); padding: calc(6px * var(--fit)) 0; align-self: baseline; overflow-wrap: anywhere; }
+.p-name { font: 400 calc(24px * var(--fit))/1.2 var(--serif); padding: calc(6px * var(--fit)) 0; align-self: baseline; white-space: nowrap; }
 .p-empty { color: var(--rule); font-style: italic; }
 
 /* ---------- Print & export hosts ---------- */
@@ -141,7 +141,7 @@ button { font: inherit; cursor: pointer; }
 <div class="app">
   <aside class="panel">
     <h1>Seating Chart</h1>
-    <p class="lede">Edit on the left — the chart updates as you type. Changes are saved in this browser.</p>
+    <p class="lede">Edit on the left — the chart updates as you type. Changes are saved in this browser; edits made in the HTML file itself take over when you reload.</p>
 
     <div class="section-label">Heading</div>
     <div class="field"><label for="f-eyebrow">Top line</label><input id="f-eyebrow" type="text" data-key="eyebrow"></div>
@@ -197,21 +197,51 @@ button { font: inherit; cursor: pointer; }
 
   const DEFAULT = {
     eyebrow: 'The wedding of',
-    names: 'Olivia & Thomas',
-    meta: 'Saturday 14 March 2027 · Stones of the Yarra Valley',
+    names: 'Xinrong & Joy',
+    meta: 'Monday 19 October 2026 · Stones of the Yarra Valley',
     script: 'Please find your seat',
     paper: 'A2', orient: 'portrait', dpi: '300',
     tables: [
-      sample(1, ['Margaret Allen', 'Robert Allen', 'Sophie Chen', 'Daniel Chen', 'Grace Wilson', 'Henry Wilson', 'Isla Murray', 'Oscar Murray']),
-      sample(2, ['Charlotte Hughes', 'William Hughes', 'Amelia Park', 'Lucas Park', 'Ruby Taylor', 'Jack Taylor', 'Chloe Martin', 'Ethan Martin']),
-      sample(3, ['Harper Evans', 'Noah Evans', 'Zoe Walker', 'Leo Walker', 'Mia Scott', 'Liam Scott', 'Ella King', 'Max King']),
+      sample(1, [
+        'Jasper Liu', 'Iris Wu', 'Kailan Li', 'Celena Gao', 'Crystal Liu', 'Feng Lin', 'Jianglin Zhao', 'Shihua Tang',
+        'Qiongjuan Lin', 'Chenxi Lin', 'Renee Pan', 'Millie Lu', 'Jacky Lu', 'Xavier Xia',
+      ]),
+      sample(2, [
+        'Fiona Wu', 'Simon Cai', 'Tangtang Cai', 'Olivia Liu', 'Simon Li', 'Yan Liu', 'Kara Wu', 'Felix Yang',
+        'Alson Yang', 'Miles Pei',
+      ]),
+      sample(3, [
+        'Esther Geng', 'Nick Zhang', 'Raymond Tang', 'June', 'Gary', 'Sarah Tay', 'Angelina Liao', 'Peter Pan',
+        'Siying Lu', 'Ryan Phang', 'Jason Duong', 'Zana Glavanic', 'Igor Glavanic', 'Pronoy Bhuyan', 'Jianan Wu',
+      ]),
     ],
   };
 
-  let state;
-  try { state = JSON.parse(localStorage.getItem(STORE)) || structuredClone(DEFAULT); }
-  catch { state = structuredClone(DEFAULT); }
-  const save = () => { try { localStorage.setItem(STORE, JSON.stringify(state)); } catch {} };
+  // The browser keeps your editor changes, but anything edited in this file wins on reload:
+  // we remember what the file said last time, and any field or table that differs is taken from the file.
+  const FIELDS = ['eyebrow', 'names', 'meta', 'script', 'paper', 'orient', 'dpi'];
+  const tableKey = (t) => JSON.stringify([t.number, t.guests.map((g) => [g.seat, g.name])]);
+  const fileSnapshot = () => ({
+    ...Object.fromEntries(FIELDS.map((k) => [k, DEFAULT[k]])),
+    tables: DEFAULT.tables.map(tableKey),
+  });
+
+  let state, base;
+  try {
+    const saved = JSON.parse(localStorage.getItem(STORE));
+    if (saved) { ({ base, ...state } = saved); delete state.guestList; }
+  } catch {}
+  if (!state) state = structuredClone(DEFAULT);
+  else {
+    const now = fileSnapshot();
+    for (const k of FIELDS) if (now[k] !== base?.[k]) state[k] = DEFAULT[k];
+    DEFAULT.tables.forEach((d, i) => {
+      if (now.tables[i] === base?.tables?.[i]) return;
+      if (state.tables[i]) state.tables[i] = { ...structuredClone(d), id: state.tables[i].id };
+      else state.tables.push(structuredClone(d));
+    });
+  }
+  const save = () => { try { localStorage.setItem(STORE, JSON.stringify({ ...state, base: fileSnapshot() })); } catch {} };
 
   const $ = (s) => document.querySelector(s);
   const esc = (s) => String(s ?? '').replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
@@ -359,11 +389,15 @@ button { font: inherit; cursor: pointer; }
     const area = p.querySelector('.p-tables');
     let fit = 1.4;
     p.style.setProperty('--fit', fit);
-    while (fit > 0.4 && (area.scrollHeight > area.clientHeight + 1 || area.scrollWidth > area.clientWidth + 1)) {
+    const tables = [...area.querySelectorAll('.p-table')];
+    // Names never wrap, so a long name also counts as overflow of its table column.
+    const overflows = () => area.scrollHeight > area.clientHeight + 1 || area.scrollWidth > area.clientWidth + 1
+      || tables.some((t) => t.scrollWidth > t.clientWidth + 1);
+    while (fit > 0.4 && overflows()) {
       fit = +(fit - 0.03).toFixed(2);
       p.style.setProperty('--fit', fit);
     }
-    const tight = fit <= 0.4 && area.scrollHeight > area.clientHeight + 1;
+    const tight = fit <= 0.4 && overflows();
     $('#status').textContent = tight ? 'Too many guests for this paper — try a larger size.' : '';
   }
 
