@@ -6,7 +6,7 @@
 <title>Seating Chart</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,500;1,300;1,400&family=Jost:wght@300;400;500&family=Castoro+Titling&family=Mrs+Saint+Delafield&family=Raleway:wght@400;500&display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,500;1,300;1,400&family=Jost:wght@300;400;500&family=Castoro+Titling&family=Herr+Von+Muellerhoff&family=Raleway:wght@400;500&display=swap">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
 <style id="page-size">@page { size: 420mm 594mm; margin: 0; }</style>
 <style>
@@ -30,7 +30,7 @@
   --serif: "Cormorant Garamond", "Adobe Garamond Pro", Garamond, Georgia, serif;
   --sans: "Jost", "Helvetica Neue", Arial, sans-serif;
   --names: "Castoro Titling", "Trajan Pro", Georgia, serif;
-  --script: "Mrs Saint Delafield", "Snell Roundhand", "Apple Chancery", cursive;
+  --script: "Herr Von Muellerhoff", "Snell Roundhand", "Apple Chancery", cursive;
   --heading: "Raleway", "Helvetica Neue", Arial, sans-serif; /* matches the wedding website */
 }
 * { box-sizing: border-box; }
@@ -103,7 +103,7 @@ button { font: inherit; cursor: pointer; }
 /* Logo sits at the bottom of the poster, below the tables. */
 .p-logo { flex: none; display: block; width: calc(280px * var(--hs)); aspect-ratio: 1200 / 799; margin: calc(8px * var(--hs)) auto 0; }
 .p-divider { width: 56px; height: 1px; background: var(--rule); margin: calc(28px * var(--hs)) auto calc(20px * var(--hs)); }
-.p-script { font: 400 calc(76px * var(--hs))/1.2 var(--script); color: #5A4535; margin: 0; }
+.p-script { font: 400 calc(76px * var(--hs))/1.2 var(--script); color: #7C6450; margin: 0; }
 
 .p-tables {
   flex: 1; min-height: 0; overflow: hidden;
@@ -144,7 +144,7 @@ button { font: inherit; cursor: pointer; }
 
 <div class="app">
   <aside class="panel">
-    <h1>Seating Chart</h1>
+    <h1>Our Favorite People</h1>
     <p class="lede">Edit on the left — the chart updates as you type. Changes are saved in this browser; edits made in the HTML file itself take over when you reload.</p>
 
     <div class="section-label">Heading</div>
@@ -204,7 +204,7 @@ button { font: inherit; cursor: pointer; }
   const DEFAULT = {
     names: 'Xinrong & Joy',
     meta: '19 October 2026',
-    script: 'Seating Chart',
+    script: 'Our Favourite People',
     paper: 'A2', orient: 'portrait', dpi: '300',
     tables: [
       sample(1, [
