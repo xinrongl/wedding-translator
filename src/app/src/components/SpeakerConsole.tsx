@@ -160,13 +160,16 @@ export const SpeakerConsole: React.FC<SpeakerConsoleProps> = ({
       service.stop();
       setIsStreaming(false);
     } else {
-      if (oauthClientId && !idToken) {
+      if (!oauthClientId) {
+        setErrorMessage('Speaker sign-in is not configured on the server (GOOGLE_OAUTH_CLIENT_ID).');
+        return;
+      }
+      if (!idToken) {
         setErrorMessage('Sign in with an approved Google account first.');
         return;
       }
       try {
-        const base = resolveWsUrl('/ws/speaker');
-        const wsUrl = idToken ? `${base}?id_token=${encodeURIComponent(idToken)}` : base;
+        const wsUrl = `${resolveWsUrl('/ws/speaker')}?id_token=${encodeURIComponent(idToken)}`;
         await service.start(wsUrl);
         setIsStreaming(true);
       } catch (err: unknown) {
@@ -484,11 +487,18 @@ export const SpeakerConsole: React.FC<SpeakerConsoleProps> = ({
                 <Box ref={googleButtonRef} sx={{ mb: 1.5 }} />
               )}
 
+              {backendConfig && !oauthClientId && (
+                <Alert severity="warning" sx={{ mb: 1.5, borderRadius: 2 }}>
+                  Speaker sign-in is not configured: set GOOGLE_OAUTH_CLIENT_ID on the backend.
+                </Alert>
+              )}
+
               <Stack direction="row" spacing={1.5} sx={{ alignItems: 'center' }}>
                 <Button
                   variant="contained"
                   fullWidth
                   onClick={toggleStreaming}
+                  disabled={!isStreaming && !idToken}
                   startIcon={isStreaming ? <MicOffIcon /> : <MicIcon />}
                   color={isStreaming ? 'error' : 'primary'}
                   sx={{

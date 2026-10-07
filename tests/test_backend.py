@@ -544,3 +544,27 @@ async def test_gemini_live_utterance_transition_commits_prior_sentence():
         assert len(finals) == 1
         assert finals[0]["chinese"] == "句子一"
         assert finals[0]["english"] == "Sentence One."
+
+
+def test_speaker_ws_rejected_when_oauth_client_id_unset(monkeypatch):
+    """Without GOOGLE_OAUTH_CLIENT_ID the speaker gate fails closed instead of admitting anyone."""
+    from starlette.websockets import WebSocketDisconnect
+
+    monkeypatch.setattr(settings, "google_oauth_client_id", None)
+    client = TestClient(app)
+    with client.websocket_connect("/ws/speaker") as ws:
+        with pytest.raises(WebSocketDisconnect) as exc:
+            ws.receive_text()
+    assert exc.value.code == 4401
+
+
+def test_speaker_ws_rejected_without_id_token(monkeypatch):
+    """With the gate configured, a connection without an ID token is rejected."""
+    from starlette.websockets import WebSocketDisconnect
+
+    monkeypatch.setattr(settings, "google_oauth_client_id", "client-id.apps.googleusercontent.com")
+    client = TestClient(app)
+    with client.websocket_connect("/ws/speaker") as ws:
+        with pytest.raises(WebSocketDisconnect) as exc:
+            ws.receive_text()
+    assert exc.value.code == 4401

@@ -405,17 +405,24 @@ async def websocket_speaker(websocket: WebSocket):
     """Speaker audio streaming WebSocket endpoint."""
     await websocket.accept()
 
-    # Optional Google Identity authentication
-    verified_email: str | None = None
-    if settings.google_oauth_client_id:
-        provided_token = websocket.query_params.get("id_token", "")
-        verified_email = verify_speaker_identity(provided_token)
-        if not verified_email:
-            await websocket.close(
-                code=4401,
-                reason="Sign in with an approved Google account to start streaming",
-            )
-            return
+    # Google Identity authentication (fail closed: no client ID means no speaker access)
+    if not settings.google_oauth_client_id:
+        logger.error(
+            "Speaker WebSocket rejected: GOOGLE_OAUTH_CLIENT_ID is not set, sign-in gate cannot verify speakers"
+        )
+        await websocket.close(
+            code=4401,
+            reason="Speaker sign-in is not configured on the server",
+        )
+        return
+    provided_token = websocket.query_params.get("id_token", "")
+    verified_email = verify_speaker_identity(provided_token)
+    if not verified_email:
+        await websocket.close(
+            code=4401,
+            reason="Sign in with an approved Google account to start streaming",
+        )
+        return
 
     acquired = await session_manager.acquire_speaker_session()
     if not acquired:
@@ -423,10 +430,7 @@ async def websocket_speaker(websocket: WebSocket):
         await websocket.close(code=4409, reason="A speaker session is already active")
         return
 
-    logger.info(
-        "Speaker audio WebSocket accepted%s",
-        f" for {verified_email}" if verified_email else "",
-    )
+    logger.info("Speaker audio WebSocket accepted for %s", verified_email)
 
     audio_queue: asyncio.Queue[bytes] = asyncio.Queue()
     text_queue: asyncio.Queue[str] = asyncio.Queue()
