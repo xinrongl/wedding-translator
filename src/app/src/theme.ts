@@ -7,108 +7,104 @@ export function getAppTheme(mode: 'light' | 'dark'): Theme {
     palette: {
       mode,
       primary: {
-        main: isDark ? '#A8C7FA' : '#0B57D0', // Google Material Design 3 Blue
+        main: isDark ? '#A8C7FA' : '#0B57D0',
         light: isDark ? '#D3E3FD' : '#4285F4',
-        dark: isDark ? '#0842A0' : '#0842A0',
+        dark: isDark ? '#70A5F9' : '#0842A0',
         contrastText: isDark ? '#041E49' : '#FFFFFF',
       },
       secondary: {
-        main: isDark ? '#7FCFFF' : '#00639B',
-        light: '#C2E7FF',
-        dark: '#004A77',
-        contrastText: isDark ? '#001D31' : '#FFFFFF',
+        main: isDark ? '#94A3B8' : '#64748B',
+        light: '#CBD5E1',
+        dark: '#475569',
+        contrastText: isDark ? '#0F172A' : '#FFFFFF',
       },
       success: {
-        main: isDark ? '#6DD58C' : '#1E8E3E', // Google Green
-        light: '#C4EED0',
-        dark: '#0F5223',
-        contrastText: isDark ? '#0A3818' : '#FFFFFF',
+        main: isDark ? '#4ADE80' : '#16A34A',
+        light: '#86EFAC',
+        dark: '#15803D',
+        contrastText: isDark ? '#052E16' : '#FFFFFF',
       },
       warning: {
-        main: isDark ? '#FEE180' : '#E37400', // Google Amber
-        light: '#FFE082',
-        dark: '#B06000',
-        contrastText: '#1F1F1F',
+        main: isDark ? '#FBBF24' : '#D97706',
+        light: '#FDE68A',
+        dark: '#B45309',
+        contrastText: '#18181B',
       },
       error: {
-        main: isDark ? '#F2B8B5' : '#B3261E', // Google Red
-        light: '#F9DEDC',
-        dark: '#601410',
-        contrastText: isDark ? '#601410' : '#FFFFFF',
+        main: isDark ? '#F87171' : '#DC2626',
+        light: '#FECACA',
+        dark: '#B91C1C',
+        contrastText: '#FFFFFF',
       },
       background: {
-        default: isDark ? '#121316' : '#F8FAFD', // Android 14/15 M3 Background
-        paper: isDark ? '#1E1F22' : '#FFFFFF',   // Android M3 Surface
+        default: isDark ? '#090A0B' : '#FAFAFA',
+        paper: isDark ? '#121316' : '#FFFFFF',
       },
       text: {
-        primary: isDark ? '#E2E2E6' : '#1F1F1F', // Google M3 high emphasis
-        secondary: isDark ? '#C4C6D0' : '#444746', // Google M3 medium emphasis
+        primary: isDark ? '#F4F4F5' : '#18181B',
+        secondary: isDark ? '#A1A1AA' : '#71717A',
       },
-      divider: isDark ? 'rgba(255, 255, 255, 0.1)' : '#E0E2EC',
+      divider: isDark ? 'rgba(255, 255, 255, 0.08)' : 'rgba(0, 0, 0, 0.08)',
     },
     typography: {
-      fontFamily: '"Outfit", "Google Sans", "Plus Jakarta Sans", "Roboto", system-ui, -apple-system, sans-serif',
+      fontFamily: '"Outfit", "Plus Jakarta Sans", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
       h1: {
-        fontFamily: '"Outfit", "Google Sans", sans-serif',
         fontWeight: 600,
-        letterSpacing: '-0.02em',
+        letterSpacing: '-0.03em',
       },
       h2: {
-        fontFamily: '"Outfit", "Google Sans", sans-serif',
+        fontWeight: 600,
+        letterSpacing: '-0.025em',
+      },
+      h3: {
         fontWeight: 600,
         letterSpacing: '-0.02em',
       },
-      h3: {
-        fontFamily: '"Outfit", "Google Sans", sans-serif',
-        fontWeight: 600,
-        letterSpacing: '-0.01em',
-      },
       h4: {
-        fontFamily: '"Outfit", "Google Sans", sans-serif',
         fontWeight: 600,
+        letterSpacing: '-0.015em',
       },
       h5: {
-        fontFamily: '"Outfit", "Google Sans", sans-serif',
         fontWeight: 600,
       },
       h6: {
-        fontFamily: '"Outfit", "Google Sans", sans-serif',
         fontWeight: 600,
       },
       subtitle1: {
         fontWeight: 500,
+        letterSpacing: '-0.01em',
       },
       subtitle2: {
         fontWeight: 500,
       },
       body1: {
         fontSize: '0.9375rem',
-        lineHeight: 1.6,
+        lineHeight: 1.65,
       },
       body2: {
         fontSize: '0.84375rem',
-        lineHeight: 1.5,
+        lineHeight: 1.55,
       },
       button: {
         textTransform: 'none',
-        fontWeight: 600,
+        fontWeight: 550,
         letterSpacing: '0.01em',
       },
     },
     shape: {
-      borderRadius: 20, // Android M3 squircle radius
+      borderRadius: 16,
     },
     components: {
       MuiCssBaseline: {
         styleOverrides: {
           body: {
-            scrollbarColor: isDark ? '#2B2D33 #121316' : '#C4C7C5 #F8FAFD',
+            scrollbarColor: isDark ? '#27272A #090A0B' : '#D4D4D8 #FAFAFA',
             '&::-webkit-scrollbar': {
-              width: 8,
-              height: 8,
+              width: 6,
+              height: 6,
             },
             '&::-webkit-scrollbar-thumb': {
-              backgroundColor: isDark ? 'rgba(255, 255, 255, 0.2)' : 'rgba(0, 0, 0, 0.2)',
+              backgroundColor: isDark ? 'rgba(255, 255, 255, 0.15)' : 'rgba(0, 0, 0, 0.15)',
               borderRadius: 9999,
             },
           },
@@ -117,15 +113,13 @@ export function getAppTheme(mode: 'light' | 'dark'): Theme {
       MuiButton: {
         styleOverrides: {
           root: {
-            borderRadius: 9999, // Google M3 Pill Button
-            padding: '8px 20px',
+            borderRadius: 9999,
+            padding: '7px 18px',
             boxShadow: 'none',
-            fontSize: '0.875rem',
-            transition: 'all 0.2s cubic-bezier(0.2, 0, 0, 1)',
+            fontSize: '0.84375rem',
+            transition: 'all 0.15s ease',
             '&:hover': {
-              boxShadow: isDark
-                ? '0 2px 10px rgba(168, 199, 250, 0.25)'
-                : '0 2px 10px rgba(11, 87, 208, 0.2)',
+              boxShadow: 'none',
             },
           },
           contained: {
@@ -136,11 +130,11 @@ export function getAppTheme(mode: 'light' | 'dark'): Theme {
             },
           },
           outlined: {
-            borderColor: isDark ? 'rgba(255, 255, 255, 0.2)' : '#E0E2EC',
-            color: isDark ? '#E2E2E6' : '#1F1F1F',
+            borderColor: isDark ? 'rgba(255, 255, 255, 0.12)' : 'rgba(0, 0, 0, 0.12)',
+            color: isDark ? '#F4F4F5' : '#18181B',
             '&:hover': {
-              backgroundColor: isDark ? 'rgba(168, 199, 250, 0.08)' : 'rgba(11, 87, 208, 0.06)',
-              borderColor: isDark ? '#A8C7FA' : '#0B57D0',
+              backgroundColor: isDark ? 'rgba(255, 255, 255, 0.05)' : 'rgba(0, 0, 0, 0.04)',
+              borderColor: isDark ? 'rgba(255, 255, 255, 0.25)' : 'rgba(0, 0, 0, 0.25)',
             },
           },
         },
@@ -149,50 +143,54 @@ export function getAppTheme(mode: 'light' | 'dark'): Theme {
         styleOverrides: {
           root: {
             backgroundImage: 'none',
-            borderRadius: 24, // Android M3 Container
-            transition: 'box-shadow 0.2s ease, border-color 0.2s ease, background-color 0.2s ease',
+            borderRadius: 18,
+            border: `1px solid ${isDark ? 'rgba(255, 255, 255, 0.08)' : 'rgba(0, 0, 0, 0.07)'}`,
+            boxShadow: isDark
+              ? '0 1px 2px rgba(0, 0, 0, 0.5)'
+              : '0 1px 3px rgba(0, 0, 0, 0.04)',
           },
         },
       },
       MuiCard: {
         styleOverrides: {
           root: {
-            borderRadius: 24,
-            border: `1px solid ${isDark ? 'rgba(255, 255, 255, 0.08)' : '#E0E2EC'}`,
-            boxShadow: isDark ? '0 4px 20px rgba(0, 0, 0, 0.4)' : '0 2px 12px rgba(11, 87, 208, 0.04)',
+            borderRadius: 18,
+            border: `1px solid ${isDark ? 'rgba(255, 255, 255, 0.08)' : 'rgba(0, 0, 0, 0.07)'}`,
+            boxShadow: 'none',
+            backgroundImage: 'none',
           },
         },
       },
       MuiChip: {
         styleOverrides: {
           root: {
-            borderRadius: 9999, // Google Pill Chip
+            borderRadius: 9999,
             fontWeight: 500,
-            fontSize: '0.78125rem',
-            letterSpacing: '0.01em',
+            fontSize: '0.75rem',
+            border: `1px solid ${isDark ? 'rgba(255, 255, 255, 0.1)' : 'rgba(0, 0, 0, 0.08)'}`,
           },
         },
       },
       MuiDialog: {
         styleOverrides: {
           paper: {
-            borderRadius: 28, // Android M3 Dialog
-            border: `1px solid ${isDark ? 'rgba(255, 255, 255, 0.1)' : '#E0E2EC'}`,
-            boxShadow: isDark ? '0 12px 40px rgba(0, 0, 0, 0.6)' : '0 12px 40px rgba(11, 87, 208, 0.12)',
+            borderRadius: 20,
+            border: `1px solid ${isDark ? 'rgba(255, 255, 255, 0.12)' : 'rgba(0, 0, 0, 0.1)'}`,
+            boxShadow: isDark ? '0 16px 48px rgba(0, 0, 0, 0.7)' : '0 16px 48px rgba(0, 0, 0, 0.08)',
           },
         },
       },
       MuiTooltip: {
         styleOverrides: {
           tooltip: {
-            borderRadius: 9999,
+            borderRadius: 8,
             fontSize: '0.75rem',
-            padding: '6px 12px',
-            backgroundColor: isDark ? '#2B2D33' : '#1F1F1F',
+            padding: '5px 10px',
+            backgroundColor: isDark ? '#27272A' : '#18181B',
             color: '#FFFFFF',
           },
           arrow: {
-            color: isDark ? '#2B2D33' : '#1F1F1F',
+            color: isDark ? '#27272A' : '#18181B',
           },
         },
       },
@@ -201,11 +199,12 @@ export function getAppTheme(mode: 'light' | 'dark'): Theme {
           root: {
             textTransform: 'none',
             fontWeight: 500,
-            fontSize: '0.84375rem',
-            minHeight: 40,
+            fontSize: '0.8125rem',
+            minHeight: 36,
             borderRadius: 9999,
-            margin: '0 3px',
-            transition: 'all 0.2s ease',
+            margin: '0 2px',
+            padding: '6px 14px',
+            transition: 'all 0.15s ease',
           },
         },
       },

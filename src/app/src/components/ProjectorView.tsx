@@ -1,7 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import {
   Languages,
-  Sparkles,
   Volume2,
   Moon,
   Sun,
@@ -146,47 +145,35 @@ export const ProjectorView: React.FC<ProjectorViewProps> = ({
 
   return (
     <div
-      className={`relative h-[calc(100vh-65px)] max-h-[calc(100vh-65px)] flex flex-col justify-between p-4 sm:p-6 md:p-8 lg:p-10 select-none overflow-hidden transition-colors duration-700 ${
+      className={`relative h-[calc(100vh-65px)] max-h-[calc(100vh-65px)] flex flex-col justify-between p-4 sm:p-6 md:p-8 lg:p-10 select-none overflow-hidden transition-colors duration-300 ${
         isDarkTheme
-          ? 'bg-[#141312] text-[#FAF8F5]'
-          : 'bg-[#FAF8F5] text-[#1C1A17] bg-paper-texture'
+          ? 'bg-[#090A0B] text-[#F4F4F5]'
+          : 'bg-[#FAFAFA] text-[#18181B]'
       }`}
     >
-      {/* Ambient glow effects */}
-      {isDarkTheme ? (
-        <>
-          <div className="absolute top-1/4 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[850px] h-[450px] bg-[#0B57D0]/10 blur-[150px] rounded-full pointer-events-none" />
-          <div className="absolute bottom-10 right-10 w-[550px] h-[380px] bg-[#34A853]/8 blur-[130px] rounded-full pointer-events-none" />
-        </>
-      ) : (
-        <>
-          <div className="absolute top-1/4 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[700px] h-[350px] bg-[#0B57D0]/5 blur-[120px] rounded-full pointer-events-none" />
-        </>
-      )}
-
       {/* Top Banner: Venue Identification & Projection Quick Controls */}
       <div
         className={`relative z-20 flex flex-wrap items-center justify-between pb-3 md:pb-4 border-b gap-3 transition-colors ${
-          isDarkTheme ? 'border-[#333538]' : 'border-[#DEE2E6]'
+          isDarkTheme ? 'border-[rgba(255,255,255,0.08)]' : 'border-[rgba(0,0,0,0.08)]'
         }`}
       >
         <div className="flex items-center space-x-3">
           <div
-            className={`w-2.5 h-2.5 rounded-full ${
-              isDarkTheme ? 'bg-[#A8C7FA] shadow-sm shadow-[#A8C7FA]' : 'bg-[#0B57D0]'
+            className={`w-2 h-2 rounded-full ${
+              isSessionActive ? 'bg-[#10B981]' : isDarkTheme ? 'bg-[#52525B]' : 'bg-[#D4D4D8]'
             }`}
           />
           <div>
             <div className="flex items-center space-x-2">
-              <h2 className="tracking-[0.15em] uppercase text-xs md:text-sm font-bold">
+              <h2 className="tracking-widest uppercase text-xs md:text-sm font-semibold text-stone-300 dark:text-stone-300">
                 The Stable at Stones
               </h2>
               {sessionInfo && (
                 <span
-                  className={`text-[10px] font-sans px-2.5 py-0.5 rounded-full font-medium tracking-normal ${
+                  className={`text-[10px] font-sans px-2 py-0.5 rounded-full font-medium tracking-normal ${
                     isDarkTheme
-                      ? 'bg-[#0B57D0]/20 text-[#A8C7FA] border border-[#0B57D0]/40'
-                      : 'bg-[#E8F0FE] text-[#0B57D0] border border-[#D3E3FD]'
+                      ? 'bg-[rgba(255,255,255,0.06)] text-[#A1A1AA] border border-[rgba(255,255,255,0.08)]'
+                      : 'bg-[rgba(0,0,0,0.04)] text-[#71717A] border border-[rgba(0,0,0,0.06)]'
                   }`}
                 >
                   #{sessionInfo.session_number}: {sessionInfo.session_title}
@@ -194,43 +181,42 @@ export const ProjectorView: React.FC<ProjectorViewProps> = ({
               )}
             </div>
             <p className="text-[11px] font-sans tracking-widest uppercase text-stone-500">
-              {wedding.bride_name} &amp; {wedding.groom_name} • Live Translation
+              {wedding.bride_name} &amp; {wedding.groom_name}
             </p>
           </div>
         </div>
 
         {/* Floating Quick Settings Deck */}
         <div
-          className={`flex flex-wrap items-center space-x-1.5 md:space-x-2 backdrop-blur-md px-3 py-1.5 rounded-2xl border text-xs transition-all ${
+          className={`flex flex-wrap items-center space-x-1.5 md:space-x-2 px-3 py-1.5 rounded-full border text-xs transition-all ${
             isDarkTheme
-              ? 'bg-[#1E1F22]/90 border-[#333538] text-stone-200 shadow-lg'
-              : 'bg-white/95 border-[#DEE2E6] text-stone-700 shadow-sm'
+              ? 'bg-[#121316] border-[rgba(255,255,255,0.08)] text-stone-300'
+              : 'bg-white border-[rgba(0,0,0,0.08)] text-stone-700'
           }`}
         >
           {/* New Session Operator Button */}
           {onOpenNewSession && (
             <button
               onClick={onOpenNewSession}
-              className={`flex items-center space-x-1 px-3 py-1 rounded-full text-[11px] font-sans font-semibold transition-all border ${
+              className={`flex items-center space-x-1 px-2.5 py-1 rounded-full text-[11px] font-sans font-medium transition-all border ${
                 isDarkTheme
-                  ? 'bg-[#0B57D0]/20 border-[#0B57D0]/40 text-[#A8C7FA] hover:bg-[#0B57D0]/35 hover:text-white'
-                  : 'bg-[#E8F0FE] border-[#D3E3FD] text-[#0B57D0] hover:bg-[#D3E3FD]'
+                  ? 'border-[rgba(255,255,255,0.1)] text-[#D4D4D8] hover:bg-[rgba(255,255,255,0.05)]'
+                  : 'border-[rgba(0,0,0,0.1)] text-[#52525B] hover:bg-[rgba(0,0,0,0.03)]'
               }`}
               title="Start a new translation speech session"
             >
-              <PlusCircle className={`w-3.5 h-3.5 ${isDarkTheme ? 'text-[#A8C7FA]' : 'text-[#0B57D0]'}`} />
+              <PlusCircle className="w-3.5 h-3.5" />
               <span className="hidden sm:inline">New Session</span>
             </button>
           )}
+
           {/* Audio VU Indicator */}
           {isSessionActive && (
-            <div className="flex items-center space-x-2 mr-1 pr-2 border-r border-stone-500/30">
-              <Volume2
-                className={`w-3.5 h-3.5 ${isDarkTheme ? 'text-[#A8C7FA]' : 'text-[#0B57D0]'}`}
-              />
-              <div className="w-12 md:w-16 h-1.5 bg-stone-700/30 rounded-full overflow-hidden">
+            <div className="flex items-center space-x-2 mr-1 pr-2 border-r border-stone-500/20">
+              <Volume2 className="w-3.5 h-3.5 text-stone-400" />
+              <div className="w-12 md:w-16 h-1 bg-stone-700/30 rounded-full overflow-hidden">
                 <div
-                  className="h-full bg-gradient-to-r from-emerald-500 via-[#4285F4] to-amber-500 transition-all duration-75"
+                  className="h-full bg-emerald-500 transition-all duration-75"
                   style={{ width: `${audioLevel}%` }}
                 />
               </div>
@@ -240,9 +226,8 @@ export const ProjectorView: React.FC<ProjectorViewProps> = ({
           {/* Layout Mode Segmented Control */}
           <div
             className={`flex items-center p-0.5 rounded-full border ${
-              isDarkTheme ? 'bg-[#282A2E] border-[#3C4043]' : 'bg-[#F0F4F9] border-[#DEE2E6]'
+              isDarkTheme ? 'bg-[rgba(255,255,255,0.03)] border-[rgba(255,255,255,0.08)]' : 'bg-[rgba(0,0,0,0.02)] border-[rgba(0,0,0,0.06)]'
             }`}
-            title="Choose Subtitle Layout"
           >
             <button
               onClick={() => setLayoutMode('side-by-side')}
@@ -259,29 +244,43 @@ export const ProjectorView: React.FC<ProjectorViewProps> = ({
               <span className="hidden sm:inline">Side-by-Side</span>
             </button>
             <button
-              onClick={() => setLayoutMode('stacked')}
-              className={`flex items-center space-x-1 px-2.5 py-1 rounded-full text-[11px] font-sans uppercase tracking-wider font-semibold transition-all ${
-                layoutMode === 'stacked'
+              onClick={() => setLayoutMode('side-by-side')}
+              className={`flex items-center space-x-1 px-2.5 py-1 rounded-full text-[11px] font-sans uppercase tracking-wider font-medium transition-all ${
+                layoutMode === 'side-by-side'
                   ? isDarkTheme
-                    ? 'bg-[#A8C7FA] text-[#041E49] shadow-xs'
-                    : 'bg-[#0B57D0] text-white shadow-xs'
+                    ? 'bg-[rgba(255,255,255,0.1)] text-[#F4F4F5]'
+                    : 'bg-black text-white'
                   : 'text-stone-400 hover:text-stone-200'
               }`}
-              title="Stacked Subtitles (Cinema Style)"
+              title="Side-by-Side Split View"
+            >
+              <Columns2 className="w-3.5 h-3.5" />
+              <span className="hidden sm:inline">Side-by-Side</span>
+            </button>
+            <button
+              onClick={() => setLayoutMode('stacked')}
+              className={`flex items-center space-x-1 px-2.5 py-1 rounded-full text-[11px] font-sans uppercase tracking-wider font-medium transition-all ${
+                layoutMode === 'stacked'
+                  ? isDarkTheme
+                    ? 'bg-[rgba(255,255,255,0.1)] text-[#F4F4F5]'
+                    : 'bg-black text-white'
+                  : 'text-stone-400 hover:text-stone-200'
+              }`}
+              title="Stacked Subtitles"
             >
               <Rows2 className="w-3.5 h-3.5" />
               <span className="hidden sm:inline">Stacked</span>
             </button>
             <button
               onClick={() => setLayoutMode('english')}
-              className={`flex items-center space-x-1 px-2.5 py-1 rounded-full text-[11px] font-sans uppercase tracking-wider font-semibold transition-all ${
+              className={`flex items-center space-x-1 px-2.5 py-1 rounded-full text-[11px] font-sans uppercase tracking-wider font-medium transition-all ${
                 layoutMode === 'english'
                   ? isDarkTheme
-                    ? 'bg-[#A8C7FA] text-[#041E49] shadow-xs'
-                    : 'bg-[#0B57D0] text-white shadow-xs'
+                    ? 'bg-[rgba(255,255,255,0.1)] text-[#F4F4F5]'
+                    : 'bg-black text-white'
                   : 'text-stone-400 hover:text-stone-200'
               }`}
-              title="English Translation Only"
+              title="English Only"
             >
               <Languages className="w-3.5 h-3.5" />
               <span className="hidden sm:inline">EN Only</span>
@@ -291,37 +290,33 @@ export const ProjectorView: React.FC<ProjectorViewProps> = ({
           {/* Font Style Toggle: Serif vs Modern Sans */}
           <button
             onClick={() => setFontStyle(fontStyle === 'serif' ? 'sans' : 'serif')}
-            className={`flex items-center space-x-1 px-2.5 py-1 rounded-full text-[11px] font-sans uppercase tracking-widest font-semibold border transition-all ${
+            className={`flex items-center space-x-1 px-2.5 py-1 rounded-full text-[11px] font-sans uppercase tracking-widest font-medium border transition-all ${
               fontStyle === 'sans'
                 ? isDarkTheme
-                  ? 'bg-[#0B57D0]/20 text-[#A8C7FA] border-[#0B57D0]/40'
-                  : 'bg-[#E8F0FE] text-[#0B57D0] border-[#D3E3FD]'
-                : isDarkTheme
-                ? 'border-transparent text-stone-400 hover:text-stone-200'
-                : 'border-transparent text-stone-600 hover:text-stone-900'
+                  ? 'bg-[rgba(255,255,255,0.06)] text-[#F4F4F5] border-[rgba(255,255,255,0.12)]'
+                  : 'bg-[rgba(0,0,0,0.04)] text-black border-[rgba(0,0,0,0.1)]'
+                : 'border-transparent text-stone-400 hover:text-stone-200'
             }`}
-            title={fontStyle === 'serif' ? 'Switch to Modern Sans-Serif Typography' : 'Switch to Romantic Editorial Serif Typography'}
           >
             <Type className="w-3.5 h-3.5" />
-            <span className="hidden md:inline">{fontStyle === 'serif' ? 'Serif' : 'Modern Sans'}</span>
+            <span className="hidden md:inline">{fontStyle === 'serif' ? 'Serif' : 'Sans'}</span>
           </button>
 
           {/* Auto-scroll Toggle */}
           <button
             onClick={() => setAutoScroll(!autoScroll)}
-            className={`flex items-center space-x-1 px-2.5 py-1 rounded-full text-[11px] font-sans uppercase tracking-widest font-semibold border transition-all ${
+            className={`flex items-center space-x-1 px-2.5 py-1 rounded-full text-[11px] font-sans uppercase tracking-widest font-medium border transition-all ${
               autoScroll
                 ? isDarkTheme
-                  ? 'bg-emerald-950/40 border-emerald-500/40 text-emerald-400'
-                  : 'bg-emerald-100 border-emerald-300 text-emerald-800'
+                  ? 'bg-emerald-950/30 border-emerald-500/30 text-emerald-400'
+                  : 'bg-emerald-50 border-emerald-200 text-emerald-800'
                 : isDarkTheme
-                ? 'bg-amber-950/40 border-amber-500/40 text-amber-400'
-                : 'bg-amber-100 border-amber-300 text-amber-800'
+                ? 'bg-amber-950/30 border-amber-500/30 text-amber-400'
+                : 'bg-amber-50 border-amber-200 text-amber-800'
             }`}
-            title={autoScroll ? 'Auto-scroll is Active (Click to Pause)' : 'Auto-scroll is Paused (Click to Resume)'}
           >
             {autoScroll ? <Play className="w-3 h-3 fill-current" /> : <Pause className="w-3 h-3 fill-current" />}
-            <span className="hidden lg:inline">{autoScroll ? 'Auto-scroll' : 'Paused'}</span>
+            <span className="hidden lg:inline">{autoScroll ? 'Scroll On' : 'Paused'}</span>
           </button>
 
           {/* Font Size Selector */}
@@ -330,12 +325,12 @@ export const ProjectorView: React.FC<ProjectorViewProps> = ({
               <button
                 key={lvl}
                 onClick={() => setFontSizeLevel(lvl)}
-                className={`w-6 h-6 rounded-full uppercase font-bold text-[10px] transition-all ${
+                className={`w-6 h-6 rounded-full uppercase font-medium text-[10px] transition-all ${
                   fontSizeLevel === lvl
                     ? isDarkTheme
-                      ? 'bg-[#A8C7FA] text-[#041E49] font-bold shadow-sm'
-                      : 'bg-[#0B57D0] text-white font-bold shadow-sm'
-                    : 'text-stone-400 hover:text-stone-200 hover:bg-stone-500/20'
+                      ? 'bg-[rgba(255,255,255,0.15)] text-[#F4F4F5]'
+                      : 'bg-black text-white'
+                    : 'text-stone-400 hover:text-stone-200'
                 }`}
               >
                 {lvl}
@@ -349,10 +344,9 @@ export const ProjectorView: React.FC<ProjectorViewProps> = ({
               onClick={onToggleTheme}
               className={`p-1.5 rounded-full text-[11px] transition-all ${
                 isDarkTheme
-                  ? 'hover:bg-[#282A2E] text-[#A8C7FA]'
-                  : 'hover:bg-[#E0E2EC] text-[#1D1B20]'
+                  ? 'hover:bg-[rgba(255,255,255,0.06)] text-stone-300'
+                  : 'hover:bg-[rgba(0,0,0,0.04)] text-stone-700'
               }`}
-              title="Toggle Stable Candlelight / Daylight"
             >
               {isDarkTheme ? <Moon className="w-3.5 h-3.5" /> : <Sun className="w-3.5 h-3.5" />}
             </button>
@@ -363,10 +357,10 @@ export const ProjectorView: React.FC<ProjectorViewProps> = ({
             onClick={toggleFullscreen}
             className={`p-1.5 rounded-full text-[11px] transition-all ${
               isDarkTheme
-                ? 'hover:bg-[#282A2E] text-stone-300 hover:text-white'
-                : 'hover:bg-[#E0E2EC] text-[#1D1B20]'
+                ? 'hover:bg-[rgba(255,255,255,0.06)] text-stone-300'
+                : 'hover:bg-[rgba(0,0,0,0.04)] text-stone-700'
             }`}
-            title={isFullscreen ? 'Exit Fullscreen' : 'Enter Fullscreen (Shortcut: F)'}
+            title="Toggle fullscreen (Shortcut: F)"
           >
             {isFullscreen ? <Minimize2 className="w-3.5 h-3.5" /> : <Maximize2 className="w-3.5 h-3.5" />}
           </button>
@@ -375,36 +369,18 @@ export const ProjectorView: React.FC<ProjectorViewProps> = ({
 
       {/* Main Center Stage: Continuous Auto-Scrolling Translation Feed */}
       <div className="relative z-10 flex-1 min-h-0 flex flex-col my-3 md:my-5">
-        {/* Soft top gradient mask so older sentences dissolve smoothly */}
-        <div
-          className={`pointer-events-none absolute top-0 left-0 right-0 h-10 z-10 transition-colors ${
-            isDarkTheme
-              ? 'bg-gradient-to-b from-[#141312] to-transparent'
-              : 'bg-gradient-to-b from-[#FAF8F5] to-transparent'
-          }`}
-        />
-
         {subtitles.length === 0 && !activePartial ? (
-          /* Empty / Waiting state with Wedding Welcome */
-          <div className="h-full flex flex-col items-center justify-center text-center space-y-5 py-12 px-4">
-            <div
-              className={`inline-flex p-4 md:p-5 rounded-full border transition-all ${
-                isDarkTheme
-                  ? 'bg-[#1E1F22] border-[#333538] text-[#A8C7FA] shadow-lg shadow-[#0B57D0]/10'
-                  : 'bg-[#E8F0FE] border-[#D3E3FD] text-[#0B57D0]'
-              }`}
-            >
-              <Sparkles className="w-8 h-8 md:w-10 md:h-10 animate-pulse" />
-            </div>
-            <h3 className="text-3xl md:text-5xl lg:text-6xl font-serif tracking-wide font-normal">
+          /* Empty / Waiting state */
+          <div className="h-full flex flex-col items-center justify-center text-center space-y-4 py-12 px-4">
+            <h3 className="text-3xl md:text-5xl lg:text-6xl font-serif tracking-normal font-normal">
               {wedding.bride_name} &amp; {wedding.groom_name}
             </h3>
-            <p className="font-serif italic text-stone-400 text-base md:text-xl max-w-xl mx-auto leading-relaxed">
-              Welcome to The Stable at Stones of the Yarra Valley. Continuous simultaneous English translation will begin once the speaker begins.
+            <p className="font-serif italic text-stone-400 text-base md:text-xl max-w-lg mx-auto leading-relaxed">
+              Live English interpretation will begin as words are spoken.
             </p>
-            <div className={`flex items-center space-x-2 text-xs font-sans tracking-widest uppercase pt-2 ${isDarkTheme ? 'text-[#A8C7FA]' : 'text-[#0B57D0]'}`}>
-              <span className={`w-2 h-2 rounded-full animate-ping ${isDarkTheme ? 'bg-[#A8C7FA]' : 'bg-[#0B57D0]'}`} />
-              <span>Microphone &amp; Translation Engine Ready</span>
+            <div className={`flex items-center space-x-2 text-xs font-sans tracking-widest uppercase pt-2 text-stone-500`}>
+              <span className={`w-1.5 h-1.5 rounded-full animate-ping ${isDarkTheme ? 'bg-[#10B981]' : 'bg-[#10B981]'}`} />
+              <span>Live Subtitles Ready</span>
             </div>
           </div>
         ) : (
@@ -412,24 +388,22 @@ export const ProjectorView: React.FC<ProjectorViewProps> = ({
           <div
             ref={scrollContainerRef}
             onScroll={handleScroll}
-            className="flex-1 overflow-y-auto px-1 sm:px-3 md:px-6 py-2 space-y-4 md:space-y-6 scrollbar-thin"
+            className="flex-1 overflow-y-auto px-1 sm:px-3 md:px-6 py-2 space-y-4 md:space-y-5 scrollbar-thin"
           >
             {/* Sticky Header for Side-by-Side Columns */}
             {layoutMode === 'side-by-side' && (
               <div
                 className={`sticky top-0 z-20 grid grid-cols-1 md:grid-cols-12 gap-4 pb-2 pt-1 px-4 md:px-6 border-b text-[11px] font-sans uppercase tracking-widest font-semibold backdrop-blur-md transition-colors ${
                   isDarkTheme
-                    ? 'bg-[#121316]/95 border-[#333538] text-stone-400'
-                    : 'bg-[#F8FAFD]/95 border-[#DEE2E6] text-stone-600'
+                    ? 'bg-[#090A0B]/95 border-[rgba(255,255,255,0.06)] text-stone-400'
+                    : 'bg-[#FAFAFA]/95 border-[rgba(0,0,0,0.06)] text-stone-600'
                 }`}
               >
                 <div className="md:col-span-5 flex items-center space-x-2">
-                  <span className="px-2 py-0.5 rounded-full bg-stone-700/50 text-stone-300 text-[10px]">ZH</span>
-                  <span>Mandarin Speech (现场原声)</span>
+                  <span>Mandarin Speech</span>
                 </div>
-                <div className={`md:col-span-7 flex items-center space-x-2 pl-0 md:pl-4 md:border-l ${isDarkTheme ? 'border-[#333538]' : 'border-[#DEE2E6]'}`}>
-                  <span className={`px-2 py-0.5 rounded-full text-[10px] ${isDarkTheme ? 'bg-[#0B57D0]/25 text-[#A8C7FA]' : 'bg-[#E8F0FE] text-[#0B57D0]'}`}>EN</span>
-                  <span className={isDarkTheme ? 'text-[#A8C7FA]' : 'text-[#0B57D0]'}>Live English Translation (实时同传)</span>
+                <div className={`md:col-span-7 flex items-center space-x-2 pl-0 md:pl-4 md:border-l ${isDarkTheme ? 'border-[rgba(255,255,255,0.06)]' : 'border-[rgba(0,0,0,0.06)]'}`}>
+                  <span>English Translation</span>
                 </div>
               </div>
             )}
@@ -440,24 +414,24 @@ export const ProjectorView: React.FC<ProjectorViewProps> = ({
                 key={item.id}
                 className={`transition-all duration-300 ${
                   layoutMode === 'side-by-side'
-                    ? /* ================= SIDE-BY-SIDE SPLIT CARD ================= */
-                      `grid grid-cols-1 md:grid-cols-12 gap-4 md:gap-6 p-4 sm:p-5 md:p-6 rounded-3xl border ${
+                    ? /* Side-by-Side */
+                      `grid grid-cols-1 md:grid-cols-12 gap-4 md:gap-6 p-4 sm:p-5 md:p-6 rounded-2xl border ${
                         isDarkTheme
-                          ? 'bg-[#1E1F22]/90 border-[#333538] hover:border-[#A8C7FA]/40'
-                          : 'bg-[#FFFFFF] border-[#DEE2E6] hover:border-[#0B57D0]/40 shadow-xs'
+                          ? 'bg-[#121316] border-[rgba(255,255,255,0.06)] hover:border-[rgba(255,255,255,0.12)]'
+                          : 'bg-white border-[rgba(0,0,0,0.06)] hover:border-[rgba(0,0,0,0.12)]'
                       }`
                     : layoutMode === 'stacked'
-                    ? /* ================= STACKED CARD ================= */
-                      `p-4 sm:p-6 rounded-3xl border space-y-3 ${
+                    ? /* Stacked */
+                      `p-4 sm:p-6 rounded-2xl border space-y-3 ${
                         isDarkTheme
-                          ? 'bg-[#1E1F22]/90 border-[#333538] hover:border-[#A8C7FA]/40'
-                          : 'bg-[#FFFFFF] border-[#DEE2E6] hover:border-[#0B57D0]/40 shadow-xs'
+                          ? 'bg-[#121316] border-[rgba(255,255,255,0.06)] hover:border-[rgba(255,255,255,0.12)]'
+                          : 'bg-white border-[rgba(0,0,0,0.06)] hover:border-[rgba(0,0,0,0.12)]'
                       }`
-                    : /* ================= ENGLISH ONLY CARD ================= */
-                      `p-4 sm:p-6 rounded-3xl border space-y-2 ${
+                    : /* English Only */
+                      `p-4 sm:p-6 rounded-2xl border space-y-2 ${
                         isDarkTheme
-                          ? 'bg-[#1E1F22]/90 border-[#333538] hover:border-[#A8C7FA]/40'
-                          : 'bg-[#FFFFFF] border-[#DEE2E6] hover:border-[#0B57D0]/40 shadow-xs'
+                          ? 'bg-[#121316] border-[rgba(255,255,255,0.06)] hover:border-[rgba(255,255,255,0.12)]'
+                          : 'bg-white border-[rgba(0,0,0,0.06)] hover:border-[rgba(0,0,0,0.12)]'
                       }`
                 }`}
               >
@@ -473,7 +447,7 @@ export const ProjectorView: React.FC<ProjectorViewProps> = ({
                         </div>
                         <p
                           className={`font-sans leading-relaxed tracking-wide ${
-                            isDarkTheme ? 'text-stone-300' : 'text-stone-700'
+                            isDarkTheme ? 'text-stone-400' : 'text-stone-600'
                           } ${fontSizes.chineseSplit}`}
                         >
                           {item.chinese || '—'}
@@ -484,14 +458,12 @@ export const ProjectorView: React.FC<ProjectorViewProps> = ({
                     {/* Right Column: English Translation */}
                     <div
                       className={`md:col-span-7 flex flex-col justify-between pl-0 md:pl-4 md:border-l pt-3 md:pt-0 border-t md:border-t-0 ${
-                        isDarkTheme ? 'border-[rgba(255,255,255,0.1)]' : 'border-[rgba(0,0,0,0.08)]'
+                        isDarkTheme ? 'border-[rgba(255,255,255,0.06)]' : 'border-[rgba(0,0,0,0.06)]'
                       }`}
                     >
                       <p
-                        className={`${fontClass} font-medium tracking-normal ${fontSizes.englishSplit} ${
-                          isDarkTheme
-                            ? 'text-[#FAF8F5] drop-shadow-[0_1px_8px_rgba(66,133,244,0.15)]'
-                            : 'text-[#1C1A17]'
+                        className={`${fontClass} font-normal tracking-normal ${fontSizes.englishSplit} ${
+                          isDarkTheme ? 'text-[#F4F4F5]' : 'text-[#18181B]'
                         }`}
                       >
                         {item.english}
@@ -506,39 +478,23 @@ export const ProjectorView: React.FC<ProjectorViewProps> = ({
                     </div>
 
                     {item.chinese && (
-                      <div className="flex items-start space-x-2.5">
-                        <span
-                          className={`px-1.5 py-0.5 rounded text-[10px] font-sans font-bold tracking-wider uppercase border mt-0.5 ${
-                            isDarkTheme
-                              ? 'bg-stone-800/80 border-stone-700 text-stone-300'
-                              : 'bg-stone-200 border-stone-300 text-stone-700'
-                          }`}
-                        >
-                          ZH
-                        </span>
-                        <p
-                          className={`font-sans leading-relaxed ${
-                            isDarkTheme ? 'text-stone-300' : 'text-stone-600'
-                          } ${fontSizes.chineseStacked}`}
-                        >
-                          {item.chinese}
-                        </p>
-                      </div>
+                      <p
+                        className={`font-sans leading-relaxed ${
+                          isDarkTheme ? 'text-stone-400' : 'text-stone-600'
+                        } ${fontSizes.chineseStacked}`}
+                      >
+                        {item.chinese}
+                      </p>
                     )}
 
                     <div
-                      className={`flex items-start space-x-2.5 pt-2 border-t ${
-                        isDarkTheme ? 'border-[#333538]' : 'border-[#DEE2E6]'
+                      className={`pt-2 border-t ${
+                        isDarkTheme ? 'border-[rgba(255,255,255,0.06)]' : 'border-[rgba(0,0,0,0.06)]'
                       }`}
                     >
-                      <span className={`px-2 py-0.5 rounded-full text-[10px] font-sans font-bold tracking-wider uppercase mt-0.5 ${isDarkTheme ? 'bg-[#0B57D0]/20 text-[#A8C7FA]' : 'bg-[#E8F0FE] text-[#0B57D0]'}`}>
-                        EN
-                      </span>
                       <p
-                        className={`${fontClass} font-medium tracking-normal ${fontSizes.englishStacked} ${
-                          isDarkTheme
-                            ? 'text-[#FAF8F5]'
-                            : 'text-[#1C1A17]'
+                        className={`${fontClass} font-normal tracking-normal ${fontSizes.englishStacked} ${
+                          isDarkTheme ? 'text-[#F4F4F5]' : 'text-[#18181B]'
                         }`}
                       >
                         {item.english}
@@ -552,10 +508,8 @@ export const ProjectorView: React.FC<ProjectorViewProps> = ({
                       {item.timestamp}
                     </div>
                     <p
-                      className={`${fontClass} font-medium tracking-normal ${fontSizes.englishStacked} ${
-                        isDarkTheme
-                          ? 'text-[#FAF8F5] drop-shadow-[0_1px_10px_rgba(223,202,155,0.22)]'
-                          : 'text-[#1C1A17]'
+                      className={`${fontClass} font-normal tracking-normal ${fontSizes.englishStacked} ${
+                        isDarkTheme ? 'text-[#F4F4F5]' : 'text-[#18181B]'
                       }`}
                     >
                       {item.english}
@@ -565,13 +519,13 @@ export const ProjectorView: React.FC<ProjectorViewProps> = ({
               </div>
             ))}
 
-            {/* Active Streaming Partial Sentence (The Speaker is Currently Talking) */}
+            {/* Active Streaming Partial Sentence */}
             {activePartial && (
               <div
-                className={`transition-all duration-300 rounded-3xl border-2 shadow-2xl animate-subtle-pulse ${
+                className={`transition-all duration-200 rounded-2xl border ${
                   isDarkTheme
-                    ? 'bg-[#1E1F22] border-[#A8C7FA] shadow-[#0B57D0]/20'
-                    : 'bg-[#FFFFFF] border-[#0B57D0] shadow-[#0B57D0]/10'
+                    ? 'bg-[#121316] border-[rgba(255,255,255,0.22)]'
+                    : 'bg-white border-[rgba(0,0,0,0.25)]'
                 } ${
                   layoutMode === 'side-by-side'
                     ? 'grid grid-cols-1 md:grid-cols-12 gap-4 md:gap-6 p-4 sm:p-5 md:p-6'
@@ -583,17 +537,17 @@ export const ProjectorView: React.FC<ProjectorViewProps> = ({
                     {/* Left: Live Chinese Input */}
                     <div className="md:col-span-5 flex flex-col justify-between space-y-2">
                       <div>
-                        <div className={`flex items-center space-x-2 text-[10px] font-mono mb-1.5 uppercase font-bold tracking-wider ${isDarkTheme ? 'text-[#A8C7FA]' : 'text-[#0B57D0]'}`}>
-                          <span className={`w-1.5 h-1.5 rounded-full animate-ping ${isDarkTheme ? 'bg-[#A8C7FA]' : 'bg-[#0B57D0]'}`} />
+                        <div className="flex items-center space-x-2 text-[10px] font-mono mb-1.5 uppercase tracking-wider text-stone-500">
+                          <span className="w-1.5 h-1.5 rounded-full bg-[#10B981] animate-ping" />
                           <span>Live Input • {activePartial.timestamp}</span>
                         </div>
                         <p
                           className={`font-sans leading-relaxed tracking-wide ${
-                            isDarkTheme ? 'text-[#FAF8F5]' : 'text-stone-800'
+                            isDarkTheme ? 'text-stone-300' : 'text-stone-700'
                           } ${fontSizes.chineseSplit}`}
                         >
                           {activePartial.chinese || (
-                            <span className="italic text-stone-500">正在倾听原声发言...</span>
+                            <span className="italic text-stone-500">Listening...</span>
                           )}
                         </p>
                       </div>
@@ -602,105 +556,70 @@ export const ProjectorView: React.FC<ProjectorViewProps> = ({
                     {/* Right: Live English Translation */}
                     <div
                       className={`md:col-span-7 flex flex-col justify-between pl-0 md:pl-4 md:border-l pt-3 md:pt-0 border-t md:border-t-0 ${
-                        isDarkTheme ? 'border-[#333538]' : 'border-[#DEE2E6]'
+                        isDarkTheme ? 'border-[rgba(255,255,255,0.06)]' : 'border-[rgba(0,0,0,0.06)]'
                       }`}
                     >
                       <div>
-                        <div className={`flex items-center space-x-1.5 text-[10px] font-sans uppercase tracking-widest font-bold mb-1.5 ${isDarkTheme ? 'text-[#A8C7FA]' : 'text-[#0B57D0]'}`}>
-                          <span>Interpreting Speech...</span>
-                        </div>
                         <p
-                          className={`${fontClass} font-semibold tracking-normal ${fontSizes.englishSplit} ${
-                            isDarkTheme
-                              ? 'text-[#FAF8F5]'
-                              : 'text-[#1C1A17]'
+                          className={`${fontClass} font-normal tracking-normal ${fontSizes.englishSplit} ${
+                            isDarkTheme ? 'text-[#F4F4F5]' : 'text-[#18181B]'
                           }`}
                         >
                           <span>{activePartial.english}</span>
-                          <span
-                            className={`inline-block w-2 md:w-2.5 h-5 md:h-7 ml-2 align-middle rounded-full animate-pulse ${
-                              isDarkTheme ? 'bg-[#A8C7FA]' : 'bg-[#0B57D0]'
-                            }`}
-                          />
+                          <span className="inline-block w-0.5 h-6 ml-1.5 align-middle bg-primary-main animate-pulse" />
                         </p>
                       </div>
                     </div>
                   </>
                 ) : layoutMode === 'stacked' ? (
                   <>
-                    <div className={`flex items-center justify-between text-[11px] font-mono font-bold uppercase tracking-wider ${isDarkTheme ? 'text-[#A8C7FA]' : 'text-[#0B57D0]'}`}>
+                    <div className="flex items-center justify-between text-[11px] font-mono tracking-wider text-stone-500">
                       <span className="flex items-center space-x-1.5">
-                        <span className={`w-2 h-2 rounded-full animate-ping ${isDarkTheme ? 'bg-[#A8C7FA]' : 'bg-[#0B57D0]'}`} />
-                        <span>Live Interpretation in Progress</span>
+                        <span className="w-1.5 h-1.5 rounded-full bg-[#10B981] animate-ping" />
+                        <span>Live Interpretation</span>
                       </span>
-                      <span className="text-stone-400 font-normal">{activePartial.timestamp}</span>
+                      <span>{activePartial.timestamp}</span>
                     </div>
 
                     {activePartial.chinese && (
-                      <div className="flex items-start space-x-2.5">
-                        <span
-                          className={`px-2 py-0.5 rounded-full text-[10px] font-sans font-bold tracking-wider uppercase border mt-0.5 ${
-                            isDarkTheme
-                              ? 'bg-stone-800 border-stone-700 text-stone-300'
-                              : 'bg-stone-200 border-stone-300 text-stone-700'
-                          }`}
-                        >
-                          ZH
-                        </span>
-                        <p
-                          className={`font-sans leading-relaxed ${
-                            isDarkTheme ? 'text-[#FAF8F5]' : 'text-stone-800'
-                          } ${fontSizes.chineseStacked}`}
-                        >
-                          {activePartial.chinese}
-                        </p>
-                      </div>
+                      <p
+                        className={`font-sans leading-relaxed ${
+                          isDarkTheme ? 'text-stone-300' : 'text-stone-700'
+                        } ${fontSizes.chineseStacked}`}
+                      >
+                        {activePartial.chinese}
+                      </p>
                     )}
 
                     <div
-                      className={`flex items-start space-x-2.5 pt-2 border-t ${
-                        isDarkTheme ? 'border-[#333538]' : 'border-[#DEE2E6]'
+                      className={`pt-2 border-t ${
+                        isDarkTheme ? 'border-[rgba(255,255,255,0.06)]' : 'border-[rgba(0,0,0,0.06)]'
                       }`}
                     >
-                      <span className={`px-2 py-0.5 rounded-full text-[10px] font-sans font-bold tracking-wider uppercase mt-0.5 ${isDarkTheme ? 'bg-[#0B57D0]/20 text-[#A8C7FA]' : 'bg-[#E8F0FE] text-[#0B57D0]'}`}>
-                        EN
-                      </span>
                       <p
-                        className={`${fontClass} font-semibold tracking-normal ${fontSizes.englishStacked} ${
-                          isDarkTheme
-                            ? 'text-[#FAF8F5]'
-                            : 'text-[#1C1A17]'
+                        className={`${fontClass} font-normal tracking-normal ${fontSizes.englishStacked} ${
+                          isDarkTheme ? 'text-[#F4F4F5]' : 'text-[#18181B]'
                         }`}
                       >
                         <span>{activePartial.english}</span>
-                        <span
-                          className={`inline-block w-2.5 md:w-3.5 h-6 md:h-9 ml-2.5 align-middle rounded-full animate-pulse ${
-                            isDarkTheme ? 'bg-[#A8C7FA]' : 'bg-[#0B57D0]'
-                          }`}
-                        />
+                        <span className="inline-block w-0.5 h-6 ml-1.5 align-middle bg-primary-main animate-pulse" />
                       </p>
                     </div>
                   </>
                 ) : (
                   /* English Only */
                   <>
-                    <div className={`flex items-center space-x-1.5 text-[10px] font-sans uppercase tracking-widest font-bold mb-1 ${isDarkTheme ? 'text-[#A8C7FA]' : 'text-[#0B57D0]'}`}>
-                      <span className={`w-1.5 h-1.5 rounded-full animate-ping ${isDarkTheme ? 'bg-[#A8C7FA]' : 'bg-[#0B57D0]'}`} />
-                      <span>Live Speech • {activePartial.timestamp}</span>
+                    <div className="flex items-center space-x-1.5 text-[10px] font-mono tracking-wider text-stone-500 mb-1">
+                      <span className="w-1.5 h-1.5 rounded-full bg-[#10B981] animate-ping" />
+                      <span>Live • {activePartial.timestamp}</span>
                     </div>
                     <p
-                      className={`${fontClass} font-semibold tracking-normal ${fontSizes.englishStacked} ${
-                        isDarkTheme
-                          ? 'text-[#FAF8F5]'
-                          : 'text-[#1C1A17]'
+                      className={`${fontClass} font-normal tracking-normal ${fontSizes.englishStacked} ${
+                        isDarkTheme ? 'text-[#F4F4F5]' : 'text-[#18181B]'
                       }`}
                     >
                       <span>{activePartial.english}</span>
-                      <span
-                        className={`inline-block w-2.5 md:w-3.5 h-6 md:h-9 ml-2.5 align-middle rounded-full animate-pulse ${
-                          isDarkTheme ? 'bg-[#A8C7FA]' : 'bg-[#0B57D0]'
-                        }`}
-                      />
+                      <span className="inline-block w-0.5 h-6 ml-1.5 align-middle bg-primary-main animate-pulse" />
                     </p>
                   </>
                 )}
@@ -717,14 +636,14 @@ export const ProjectorView: React.FC<ProjectorViewProps> = ({
           <div className="absolute bottom-5 left-1/2 -translate-x-1/2 z-30">
             <button
               onClick={scrollToBottom}
-              className={`flex items-center space-x-2 px-5 py-2.5 rounded-full border shadow-2xl backdrop-blur-md transition-all animate-bounce cursor-pointer ${
+              className={`flex items-center space-x-2 px-4 py-2 rounded-full border shadow-lg backdrop-blur-md transition-all cursor-pointer ${
                 isDarkTheme
-                  ? 'bg-[#A8C7FA] text-[#041E49] border-[#A8C7FA] font-semibold hover:bg-[#D3E3FD]'
-                  : 'bg-[#0B57D0] text-white border-[#0B57D0] font-semibold hover:bg-[#0842A0]'
+                  ? 'bg-[#121316] text-[#F4F4F5] border-[rgba(255,255,255,0.15)] hover:bg-[rgba(255,255,255,0.08)]'
+                  : 'bg-white text-black border-[rgba(0,0,0,0.15)] hover:bg-[rgba(0,0,0,0.04)]'
               }`}
             >
-              <ArrowDown className="w-4 h-4" />
-              <span className="text-xs uppercase tracking-wider font-bold">Resume Auto-Scroll</span>
+              <ArrowDown className="w-3.5 h-3.5" />
+              <span className="text-xs uppercase tracking-wider font-medium">Resume Scroll</span>
             </button>
           </div>
         )}
@@ -733,19 +652,17 @@ export const ProjectorView: React.FC<ProjectorViewProps> = ({
       {/* Bottom Footer Details */}
       <div
         className={`relative z-20 flex flex-col sm:flex-row items-center justify-between text-xs pt-3 border-t gap-2 transition-colors ${
-          isDarkTheme ? 'border-[#333538] text-stone-400' : 'border-[#DEE2E6] text-stone-500'
+          isDarkTheme ? 'border-[rgba(255,255,255,0.08)] text-stone-500' : 'border-[rgba(0,0,0,0.08)] text-stone-500'
         }`}
       >
         <div className="font-sans tracking-wide">
-          Venue: <span className="font-serif italic font-medium text-stone-300 dark:text-stone-200">The Stable</span>
-          <span className="mx-2">•</span>
-          Stones of the Yarra Valley
+          The Stable at Stones of the Yarra Valley
         </div>
 
         <div className="flex items-center space-x-3 font-sans tracking-wider text-[11px] uppercase">
-          <span>{subtitles.length} phrases translated</span>
+          <span>{subtitles.length} phrases</span>
           <span>•</span>
-          <span>Press <kbd className={`px-2 py-0.5 rounded-md text-[10px] ${isDarkTheme ? 'bg-[#282A2E] text-stone-200' : 'bg-[#F0F4F9] text-stone-800'}`}>F</kbd> for Fullscreen</span>
+          <span>Press <kbd className={`px-1.5 py-0.5 rounded text-[10px] ${isDarkTheme ? 'bg-[rgba(255,255,255,0.06)] text-stone-300' : 'bg-[rgba(0,0,0,0.06)] text-stone-700'}`}>F</kbd> for Fullscreen</span>
         </div>
       </div>
 
@@ -753,24 +670,15 @@ export const ProjectorView: React.FC<ProjectorViewProps> = ({
       {onOpenQrCode && (
         <button
           onClick={onOpenQrCode}
-          className={`fixed bottom-4 right-4 sm:bottom-6 sm:right-6 z-40 p-2 sm:p-2.5 rounded-2xl border flex items-center space-x-2.5 shadow-xl transition-all backdrop-blur-md cursor-pointer group ${
+          className={`fixed bottom-4 right-4 sm:bottom-6 sm:right-6 z-40 p-2 rounded-xl border flex items-center space-x-2 shadow-md transition-all cursor-pointer ${
             isDarkTheme
-              ? 'bg-[#1E1F22]/95 border-[#333538] text-[#E3E2E6] hover:border-[#A8C7FA] hover:bg-[#282A2E]'
-              : 'bg-white/95 border-[#DEE2E6] text-[#1D1B20] hover:border-[#0B57D0] hover:bg-white'
+              ? 'bg-[#121316] border-[rgba(255,255,255,0.08)] text-stone-300 hover:border-[rgba(255,255,255,0.2)]'
+              : 'bg-white border-[rgba(0,0,0,0.08)] text-stone-700 hover:border-[rgba(0,0,0,0.2)]'
           }`}
           title="Scan QR Code for Mobile Subtitles"
         >
-          <div className="p-1.5 rounded-xl bg-[#E8F0FE] text-[#0B57D0] shadow-xs group-hover:scale-105 transition-transform">
-            <QrCode className="w-5 h-5 sm:w-6 sm:h-6" />
-          </div>
-          <div className="text-left font-sans pr-1">
-            <div className={`text-[10px] uppercase tracking-widest font-bold ${isDarkTheme ? 'text-[#A8C7FA]' : 'text-[#0B57D0]'}`}>
-              Mobile Subtitles
-            </div>
-            <div className="text-[11px] text-stone-400">
-              Click to enlarge QR
-            </div>
-          </div>
+          <QrCode className="w-4 h-4 text-stone-400" />
+          <span className="text-[11px] font-sans font-medium">Guest QR</span>
         </button>
       )}
     </div>

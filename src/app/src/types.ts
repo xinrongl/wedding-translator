@@ -4,6 +4,7 @@ export interface SubtitleItem {
   english: string;
   timestamp: string;
   isPartial?: boolean;
+  is_interim?: boolean;
 }
 
 export interface WeddingContextData {
@@ -56,6 +57,7 @@ export interface LiveEvent {
   chinese?: string;
   english?: string;
   timestamp?: string;
+  is_interim?: boolean;
   level?: number;
   status?: string;
   live_model?: string;

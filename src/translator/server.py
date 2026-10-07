@@ -46,7 +46,10 @@ def verify_speaker_identity(token: str) -> str | None:
         return None
 
     email = (claims.get("email") or "").lower()
-    if not claims.get("email_verified") or email not in settings.speaker_allowed_emails_set:
+    if (
+        not claims.get("email_verified")
+        or email not in settings.speaker_allowed_emails_set
+    ):
         logger.warning(
             "Speaker WebSocket rejected: '%s' is not in approved allowlist",
             email or "unknown",
@@ -75,12 +78,16 @@ class BroadcastHub:
         await websocket.accept()
         async with self._lock:
             self._connections.add(websocket)
-        logger.info("Subtitle subscriber connected. Total active: %d", len(self._connections))
+        logger.info(
+            "Subtitle subscriber connected. Total active: %d", len(self._connections)
+        )
 
     async def disconnect(self, websocket: WebSocket) -> None:
         async with self._lock:
             self._connections.discard(websocket)
-        logger.info("Subtitle subscriber disconnected. Remaining: %d", len(self._connections))
+        logger.info(
+            "Subtitle subscriber disconnected. Remaining: %d", len(self._connections)
+        )
 
     @property
     def connection_count(self) -> int:
@@ -147,7 +154,11 @@ class SessionManager:
         self.history.clear()
         self.session_number += 1
         self.session_id = f"session_{int(time.time())}"
-        self.session_title = title.strip() if title and title.strip() else f"Speech Session #{self.session_number}"
+        self.session_title = (
+            title.strip()
+            if title and title.strip()
+            else f"Speech Session #{self.session_number}"
+        )
         self.session_start_time = time.time()
         return {
             "session_id": self.session_id,
@@ -303,7 +314,9 @@ async def export_transcript(format: str = "markdown"):
         return PlainTextResponse(
             "\n".join(lines),
             media_type="text/csv",
-            headers={"Content-Disposition": "attachment; filename=wedding_transcript.csv"},
+            headers={
+                "Content-Disposition": "attachment; filename=wedding_transcript.csv"
+            },
         )
 
     lines = [
@@ -417,6 +430,7 @@ async def websocket_speaker(websocket: WebSocket):
 
     audio_queue: asyncio.Queue[bytes] = asyncio.Queue()
     text_queue: asyncio.Queue[str] = asyncio.Queue()
+    control_queue: asyncio.Queue[str] = asyncio.Queue()
     translator = GeminiLiveTranslator()
 
     async def audio_interrupt_callback() -> None:
@@ -443,6 +457,48 @@ async def websocket_speaker(websocket: WebSocket):
                         await hub.broadcast({"type": "audio_level", "level": level})
 
                 elif text := message.get("text"):
+                    try:
+                        parsed = json.loads(text)
+                        if isinstance(parsed, dict):
+                            msg_t = parsed.get("type")
+                            if msg_t in ("stream_end", "client_silence", "turn_end"):
+                                logger.info(
+                                    "Received Hybrid VAD control signal: %s", msg_t
+                                )
+                                await control_queue.put("stream_end")
+                                continue
+                            elif msg_t == "client_interim":
+                                interim_zh = str(parsed.get("text", "")).strip()
+                                if interim_zh:
+                                    translator.current_chinese = interim_zh
+                                    await hub.broadcast(
+                                        {
+                                            "type": "partial",
+                                            "chinese": interim_zh,
+                                            "english": getattr(
+                                                translator, "current_english", ""
+                                            ),
+                                            "is_interim": True,
+                                        }
+                                    )
+                                continue
+                            elif msg_t == "client_final":
+                                final_zh = str(parsed.get("text", "")).strip()
+                                if final_zh:
+                                    translator.current_chinese = final_zh
+                                    await hub.broadcast(
+                                        {
+                                            "type": "partial",
+                                            "chinese": final_zh,
+                                            "english": getattr(
+                                                translator, "current_english", ""
+                                            ),
+                                            "is_interim": False,
+                                        }
+                                    )
+                                continue
+                    except Exception as exc:
+                        logger.debug("Failed parsing client JSON message: %s", exc)
                     await text_queue.put(text)
         except (WebSocketDisconnect, asyncio.CancelledError):
             pass
@@ -454,6 +510,7 @@ async def websocket_speaker(websocket: WebSocket):
             async for event in translator.start_session(
                 audio_input_queue=audio_queue,
                 text_input_queue=text_queue,
+                control_queue=control_queue,
                 audio_interrupt_callback=audio_interrupt_callback,
             ):
                 if event:

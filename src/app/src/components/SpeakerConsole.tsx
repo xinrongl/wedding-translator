@@ -15,7 +15,6 @@ import {
   TextField,
   InputAdornment,
   Snackbar,
-  alpha,
   Paper,
 } from '@mui/material';
 import MicIcon from '@mui/icons-material/Mic';
@@ -29,7 +28,6 @@ import DeleteOutlinedIcon from '@mui/icons-material/DeleteOutlined';
 import SearchIcon from '@mui/icons-material/Search';
 import SwapHorizIcon from '@mui/icons-material/SwapHoriz';
 import QrCode2Icon from '@mui/icons-material/QrCode2';
-import RadioIcon from '@mui/icons-material/Radio';
 import FormatSizeIcon from '@mui/icons-material/FormatSize';
 import ViewAgendaIcon from '@mui/icons-material/ViewAgenda';
 import ViewColumnIcon from '@mui/icons-material/ViewColumn';
@@ -133,7 +131,9 @@ export const SpeakerConsole: React.FC<SpeakerConsoleProps> = ({
           setGoogleUser(null);
         }
       },
-      onStateChange: (state) => setIsStreaming(state),
+      onStateChange: (state) => {
+        setIsStreaming(state);
+      },
     });
     audioServiceRef.current = service;
 
@@ -155,6 +155,7 @@ export const SpeakerConsole: React.FC<SpeakerConsoleProps> = ({
     if (!service) return;
 
     if (isStreaming) {
+      service.sendStreamEnd();
       service.stop();
       setIsStreaming(false);
     } else {
@@ -225,14 +226,15 @@ export const SpeakerConsole: React.FC<SpeakerConsoleProps> = ({
   return (
     <Box sx={{ maxWidth: 1200, mx: 'auto', p: { xs: 2, sm: 3, md: 4 }, pb: 8 }}>
       <Stack spacing={3.5}>
-        {/* Google Translate Language & Session Action Bar */}
+        {/* Minimalist Language & Session Action Bar */}
         <Paper
-          elevation={1}
+          elevation={0}
           sx={{
-            p: { xs: 2, sm: 2.5 },
-            bgcolor: isDarkTheme ? '#1E1F22' : '#FFFFFF',
+            p: { xs: 2, sm: 2.25 },
+            bgcolor: isDarkTheme ? '#121316' : '#FFFFFF',
             border: '1px solid',
-            borderColor: isDarkTheme ? '#333538' : '#DEE2E6',
+            borderColor: isDarkTheme ? 'rgba(255, 255, 255, 0.08)' : 'rgba(0, 0, 0, 0.08)',
+            borderRadius: 3,
             display: 'flex',
             flexWrap: 'wrap',
             alignItems: 'center',
@@ -240,62 +242,66 @@ export const SpeakerConsole: React.FC<SpeakerConsoleProps> = ({
             gap: 2,
           }}
         >
-          {/* Language Selector Pair */}
-          <Stack direction="row" spacing={1.5} sx={{ alignItems: 'center', flexWrap: 'wrap' }}>
-            <Chip
-              label="🇨🇳 Chinese (Mandarin / 普通话)"
-              variant="outlined"
-              color="primary"
+          {/* Language Pair */}
+          <Stack direction="row" spacing={1.5} sx={{ alignItems: 'center' }}>
+            <Typography
+              variant="body2"
               sx={{
-                fontWeight: 700,
-                fontSize: { xs: '0.75rem', sm: '0.85rem' },
-                py: 2,
-                px: 1,
+                fontWeight: 600,
+                color: isDarkTheme ? '#F4F4F5' : '#18181B',
+                letterSpacing: '0.01em',
               }}
-            />
+            >
+              Mandarin (Chinese)
+            </Typography>
             <Box sx={{ color: 'text.secondary', display: 'flex', alignItems: 'center' }}>
-              <SwapHorizIcon />
+              <SwapHorizIcon fontSize="small" />
             </Box>
-            <Chip
-              label="🇬🇧 English (Live Subtitles)"
-              variant="filled"
+            <Typography
+              variant="body2"
               sx={{
-                fontWeight: 700,
-                fontSize: { xs: '0.75rem', sm: '0.85rem' },
-                py: 2,
-                px: 1,
-                bgcolor: isDarkTheme ? '#A8C7FA' : '#0B57D0',
-                color: isDarkTheme ? '#041E49' : '#FFFFFF',
+                fontWeight: 600,
+                color: 'primary.main',
+                letterSpacing: '0.01em',
               }}
-            />
+            >
+              English (Live)
+            </Typography>
           </Stack>
 
           {/* Session Metadata & Action Buttons */}
           <Stack direction="row" spacing={1.5} sx={{ alignItems: 'center', flexWrap: 'wrap' }}>
             <Chip
-              icon={<RecordVoiceOverIcon sx={{ fontSize: '1rem !important' }} />}
+              icon={<RecordVoiceOverIcon sx={{ fontSize: '0.9rem !important' }} />}
               label={`Session #${sessionInfo.session_number}: ${sessionInfo.session_title}`}
+              size="small"
               sx={{
-                fontWeight: 600,
-                bgcolor: isDarkTheme ? 'rgba(168, 199, 250, 0.15)' : '#E8F0FE',
-                color: isDarkTheme ? '#A8C7FA' : '#0B57D0',
+                fontWeight: 500,
+                bgcolor: isDarkTheme ? 'rgba(255, 255, 255, 0.05)' : 'rgba(0, 0, 0, 0.04)',
+                color: isDarkTheme ? '#A1A1AA' : '#71717A',
                 border: '1px solid',
-                borderColor: isDarkTheme ? 'rgba(168, 199, 250, 0.3)' : '#D3E3FD',
+                borderColor: isDarkTheme ? 'rgba(255, 255, 255, 0.08)' : 'rgba(0, 0, 0, 0.08)',
               }}
             />
 
             {/* Create New Session Button */}
             <Button
-              variant="contained"
-              color="primary"
-              size="medium"
-              startIcon={<AddCircleOutlinedIcon />}
+              variant="outlined"
+              size="small"
+              startIcon={<AddCircleOutlinedIcon sx={{ fontSize: '1rem' }} />}
               onClick={onOpenNewSession}
               sx={{
-                fontWeight: 700,
+                fontWeight: 600,
                 fontSize: '0.8125rem',
                 borderRadius: '999px',
-                px: 2.5,
+                px: 2,
+                py: 0.5,
+                borderColor: isDarkTheme ? 'rgba(255, 255, 255, 0.15)' : 'rgba(0, 0, 0, 0.15)',
+                color: isDarkTheme ? '#F4F4F5' : '#18181B',
+                '&:hover': {
+                  borderColor: 'primary.main',
+                  bgcolor: isDarkTheme ? 'rgba(255, 255, 255, 0.03)' : 'rgba(0, 0, 0, 0.02)',
+                },
               }}
             >
               New Session
@@ -310,7 +316,7 @@ export const SpeakerConsole: React.FC<SpeakerConsoleProps> = ({
           </Alert>
         )}
 
-        {/* Google Translate Signature Dual Cards: Source Speech & Live English Translation */}
+        {/* Minimalist Dual Cards: Source Speech & Live English Translation */}
         <Box
           sx={{
             display: 'grid',
@@ -320,55 +326,86 @@ export const SpeakerConsole: React.FC<SpeakerConsoleProps> = ({
         >
           {/* LEFT CARD: Chinese Speech Input Panel */}
           <Card
-            elevation={2}
+            elevation={0}
             sx={{
               display: 'flex',
               flexDirection: 'column',
               justifyContent: 'space-between',
               minHeight: 280,
-              bgcolor: isDarkTheme ? '#1E1F22' : '#FFFFFF',
+              bgcolor: isDarkTheme ? '#121316' : '#FFFFFF',
+              border: '1px solid',
               borderColor: activePartial
-                ? (isDarkTheme ? '#A8C7FA' : '#0B57D0')
+                ? (isDarkTheme ? 'rgba(255, 255, 255, 0.25)' : 'rgba(0, 0, 0, 0.35)')
                 : isDarkTheme
-                ? '#333538'
-                : '#DEE2E6',
-              borderWidth: activePartial ? '2px' : '1px',
-              transition: 'all 0.25s ease',
+                ? 'rgba(255, 255, 255, 0.08)'
+                : 'rgba(0, 0, 0, 0.08)',
+              borderRadius: 3,
+              transition: 'border-color 0.2s ease',
             }}
           >
             <CardHeader
               title={
-                <Stack direction="row" spacing={1} sx={{ alignItems: 'center' }}>
-                  <Chip
-                    label="ZH"
-                    size="small"
+                <Stack direction="row" spacing={1.25} sx={{ alignItems: 'center' }}>
+                  <Typography
+                    variant="caption"
                     sx={{
-                      fontWeight: 800,
-                      height: 22,
-                      bgcolor: isDarkTheme ? '#282A2E' : '#E0E2EC',
-                      color: isDarkTheme ? '#A8C7FA' : '#0B57D0',
+                      fontWeight: 700,
+                      letterSpacing: '0.08em',
+                      textTransform: 'uppercase',
+                      color: isDarkTheme ? '#71717A' : '#A1A1AA',
                     }}
-                  />
-                  <Typography variant="subtitle2" sx={{ fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em' }}>
+                  >
                     Mandarin Input
                   </Typography>
                   {isStreaming && (
-                    <Chip
-                      icon={<RadioIcon sx={{ fontSize: '0.85rem !important' }} />}
-                      label="Listening"
-                      size="small"
-                      color="error"
-                      sx={{ height: 20, fontSize: '0.6875rem', fontWeight: 700 }}
-                    />
+                    <Box
+                      sx={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: 0.75,
+                        px: 1,
+                        py: 0.25,
+                        borderRadius: '999px',
+                        bgcolor: isDarkTheme ? 'rgba(239, 68, 68, 0.12)' : 'rgba(239, 68, 68, 0.08)',
+                        border: '1px solid',
+                        borderColor: isDarkTheme ? 'rgba(239, 68, 68, 0.25)' : 'rgba(239, 68, 68, 0.2)',
+                      }}
+                    >
+                      <Box
+                        sx={{
+                          width: 6,
+                          height: 6,
+                          borderRadius: '50%',
+                          bgcolor: '#EF4444',
+                          animation: 'pulse 1.5s infinite',
+                          '@keyframes pulse': {
+                            '0%, 100%': { opacity: 1, transform: 'scale(1)' },
+                            '50%': { opacity: 0.4, transform: 'scale(0.8)' },
+                          },
+                        }}
+                      />
+                      <Typography
+                        variant="caption"
+                        sx={{
+                          fontSize: '0.6875rem',
+                          fontWeight: 600,
+                          color: '#EF4444',
+                          letterSpacing: '0.04em',
+                          textTransform: 'uppercase',
+                        }}
+                      >
+                        Listening
+                      </Typography>
+                    </Box>
                   )}
                 </Stack>
               }
               action={
-                <Typography variant="caption" sx={{ color: 'text.secondary', fontWeight: 600 }}>
-                  {activePartial ? 'Live Stream' : latestFinal ? 'Latest finalized' : 'Standby'}
+                <Typography variant="caption" sx={{ color: isDarkTheme ? '#71717A' : '#A1A1AA', fontWeight: 500 }}>
+                  {activePartial ? 'Live' : latestFinal ? 'Latest finalized' : 'Standby'}
                 </Typography>
               }
-              sx={{ pb: 1, borderBottom: '1px solid', borderColor: 'divider' }}
+              sx={{ pb: 1, borderBottom: '1px solid', borderColor: isDarkTheme ? 'rgba(255, 255, 255, 0.06)' : 'rgba(0, 0, 0, 0.06)' }}
             />
 
             <CardContent sx={{ flex: 1, py: 2.5 }}>
@@ -376,9 +413,9 @@ export const SpeakerConsole: React.FC<SpeakerConsoleProps> = ({
                 <Typography
                   variant="body1"
                   sx={{
-                    fontSize: fontSizeScale === 'large' ? '1.35rem' : '1.15rem',
-                    lineHeight: 1.6,
-                    color: isDarkTheme ? '#E5DFD5' : '#2C2824',
+                    fontSize: fontSizeScale === 'large' ? '1.25rem' : '1.05rem',
+                    lineHeight: 1.7,
+                    color: isDarkTheme ? '#E4E4E7' : '#27272A',
                     fontFamily: '"Plus Jakarta Sans", sans-serif',
                   }}
                 >
@@ -386,24 +423,24 @@ export const SpeakerConsole: React.FC<SpeakerConsoleProps> = ({
                 </Typography>
               ) : (
                 <Box sx={{ py: 4, textAlign: 'center', color: 'text.secondary' }}>
-                  <Typography variant="body2" sx={{ fontStyle: 'italic' }}>
+                  <Typography variant="body2" sx={{ color: isDarkTheme ? '#52525B' : '#A1A1AA' }}>
                     {isStreaming
-                      ? 'Speak into the microphone in Mandarin Chinese...'
-                      : 'Microphone is idle. Click "Start Microphone" below to begin live interpretation.'}
+                      ? 'Speak into the microphone in Mandarin...'
+                      : 'Microphone is idle. Click "Start Microphone" to begin.'}
                   </Typography>
                 </Box>
               )}
             </CardContent>
 
             {/* Bottom Actions of Source Panel */}
-            <Box sx={{ p: 2, pt: 1, borderTop: '1px solid', borderColor: 'divider' }}>
+            <Box sx={{ p: 2, pt: 1, borderTop: '1px solid', borderColor: isDarkTheme ? 'rgba(255, 255, 255, 0.06)' : 'rgba(0, 0, 0, 0.06)' }}>
               {/* VU Meter */}
               <Box sx={{ mb: 2 }}>
                 <Stack direction="row" sx={{ justifyContent: 'space-between', alignItems: 'center', mb: 0.5 }}>
-                  <Typography variant="caption" sx={{ fontWeight: 600, color: 'text.secondary', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
-                    Acoustic Level
+                  <Typography variant="caption" sx={{ fontWeight: 600, color: isDarkTheme ? '#71717A' : '#A1A1AA', textTransform: 'uppercase', letterSpacing: '0.06em', fontSize: '0.6875rem' }}>
+                    Audio Level
                   </Typography>
-                  <Typography variant="caption" sx={{ fontFamily: 'monospace', fontWeight: 700 }}>
+                  <Typography variant="caption" sx={{ fontFamily: 'monospace', fontWeight: 600, color: isDarkTheme ? '#A1A1AA' : '#71717A' }}>
                     {localAudioLevel}%
                   </Typography>
                 </Stack>
@@ -411,12 +448,12 @@ export const SpeakerConsole: React.FC<SpeakerConsoleProps> = ({
                   variant="determinate"
                   value={localAudioLevel}
                   sx={{
-                    height: 6,
-                    borderRadius: 3,
-                    bgcolor: isDarkTheme ? '#282A2E' : '#E0E2EC',
+                    height: 4,
+                    borderRadius: 2,
+                    bgcolor: isDarkTheme ? 'rgba(255, 255, 255, 0.06)' : 'rgba(0, 0, 0, 0.06)',
                     '& .MuiLinearProgress-bar': {
-                      borderRadius: 3,
-                      background: 'linear-gradient(90deg, #4285F4, #34A853, #FBBC05, #EA4335)',
+                      borderRadius: 2,
+                      bgcolor: isStreaming ? 'primary.main' : 'text.disabled',
                     },
                   }}
                 />
@@ -446,16 +483,15 @@ export const SpeakerConsole: React.FC<SpeakerConsoleProps> = ({
                   startIcon={isStreaming ? <MicOffIcon /> : <MicIcon />}
                   color={isStreaming ? 'error' : 'primary'}
                   sx={{
-                    py: 1.25,
-                    fontWeight: 700,
+                    py: 1,
+                    fontWeight: 600,
                     fontSize: '0.875rem',
-                    borderRadius: '9999px',
-                    boxShadow: isStreaming
-                      ? '0 4px 16px rgba(217, 48, 37, 0.35)'
-                      : '0 4px 16px rgba(11, 87, 208, 0.25)',
+                    borderRadius: '999px',
+                    boxShadow: 'none',
+                    letterSpacing: '0.01em',
                   }}
                 >
-                  {isStreaming ? 'Stop Microphone' : 'Start Microphone (Gemini 3.8 Live)'}
+                  {isStreaming ? 'Stop Microphone' : 'Start Microphone'}
                 </Button>
 
                 {isStreaming && (
@@ -465,11 +501,11 @@ export const SpeakerConsole: React.FC<SpeakerConsoleProps> = ({
                       color={isMuted ? 'warning' : 'default'}
                       sx={{
                         border: '1px solid',
-                        borderColor: isMuted ? 'warning.main' : 'divider',
-                        p: 1.25,
+                        borderColor: isMuted ? 'warning.main' : (isDarkTheme ? 'rgba(255, 255, 255, 0.1)' : 'rgba(0, 0, 0, 0.1)'),
+                        p: 1,
                       }}
                     >
-                      {isMuted ? <MicOffIcon /> : <MicIcon />}
+                      {isMuted ? <MicOffIcon fontSize="small" /> : <MicIcon fontSize="small" />}
                     </IconButton>
                   </Tooltip>
                 )}
@@ -477,41 +513,38 @@ export const SpeakerConsole: React.FC<SpeakerConsoleProps> = ({
             </Box>
           </Card>
 
-          {/* RIGHT CARD: Live English Translation Panel (Google Translate Experience) */}
+          {/* RIGHT CARD: Live English Translation Panel */}
           <Card
-            elevation={2}
+            elevation={0}
             sx={{
               display: 'flex',
               flexDirection: 'column',
               justifyContent: 'space-between',
               minHeight: 280,
-              bgcolor: isDarkTheme ? '#1E1F22' : '#FFFFFF',
+              bgcolor: isDarkTheme ? '#121316' : '#FFFFFF',
+              border: '1px solid',
               borderColor: activePartial
-                ? (isDarkTheme ? '#A8C7FA' : '#0B57D0')
+                ? (isDarkTheme ? 'rgba(255, 255, 255, 0.25)' : 'rgba(0, 0, 0, 0.35)')
                 : isDarkTheme
-                ? '#333538'
-                : '#DEE2E6',
-              borderWidth: activePartial ? '2px' : '1px',
-              transition: 'all 0.25s ease',
+                ? 'rgba(255, 255, 255, 0.08)'
+                : 'rgba(0, 0, 0, 0.08)',
+              borderRadius: 3,
+              transition: 'border-color 0.2s ease',
             }}
           >
             <CardHeader
               title={
-                <Stack direction="row" spacing={1} sx={{ alignItems: 'center' }}>
-                  <Chip
-                    label="EN"
-                    size="small"
-                    sx={{
-                      fontWeight: 800,
-                      height: 22,
-                      bgcolor: isDarkTheme ? '#A8C7FA' : '#0B57D0',
-                      color: isDarkTheme ? '#041E49' : '#FFFFFF',
-                    }}
-                  />
-                  <Typography variant="subtitle2" sx={{ fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em' }}>
-                    English Translation
-                  </Typography>
-                </Stack>
+                <Typography
+                  variant="caption"
+                  sx={{
+                    fontWeight: 700,
+                    letterSpacing: '0.08em',
+                    textTransform: 'uppercase',
+                    color: isDarkTheme ? '#71717A' : '#A1A1AA',
+                  }}
+                >
+                  English Translation
+                </Typography>
               }
               action={
                 <Stack direction="row" spacing={0.5} sx={{ alignItems: 'center' }}>
@@ -519,13 +552,14 @@ export const SpeakerConsole: React.FC<SpeakerConsoleProps> = ({
                     <IconButton
                       size="small"
                       onClick={() => setFontSizeScale(fontSizeScale === 'normal' ? 'large' : 'normal')}
+                      sx={{ color: isDarkTheme ? '#A1A1AA' : '#71717A' }}
                     >
                       <FormatSizeIcon fontSize="small" />
                     </IconButton>
                   </Tooltip>
                 </Stack>
               }
-              sx={{ pb: 1, borderBottom: '1px solid', borderColor: 'divider' }}
+              sx={{ pb: 1, borderBottom: '1px solid', borderColor: isDarkTheme ? 'rgba(255, 255, 255, 0.06)' : 'rgba(0, 0, 0, 0.06)' }}
             />
 
             <CardContent sx={{ flex: 1, py: 2.5 }}>
@@ -535,10 +569,10 @@ export const SpeakerConsole: React.FC<SpeakerConsoleProps> = ({
                     variant="body1"
                     sx={{
                       fontFamily: fontStyle === 'serif' ? '"Playfair Display", serif' : '"Plus Jakarta Sans", sans-serif',
-                      fontSize: fontSizeScale === 'large' ? '1.5rem' : '1.25rem',
-                      fontWeight: 600,
-                      lineHeight: 1.5,
-                      color: isDarkTheme ? '#FAF8F5' : '#1C1A17',
+                      fontSize: fontSizeScale === 'large' ? '1.4rem' : '1.15rem',
+                      fontWeight: 500,
+                      lineHeight: 1.6,
+                      color: isDarkTheme ? '#F4F4F5' : '#18181B',
                     }}
                   >
                     {currentDisplayEnglish}
@@ -547,10 +581,10 @@ export const SpeakerConsole: React.FC<SpeakerConsoleProps> = ({
                         component="span"
                         sx={{
                           display: 'inline-block',
-                          width: 8,
+                          width: 2,
                           height: 18,
                           bgcolor: 'primary.main',
-                          ml: 1,
+                          ml: 0.75,
                           verticalAlign: 'middle',
                           animation: 'blink 1s infinite',
                           '@keyframes blink': {
@@ -564,38 +598,38 @@ export const SpeakerConsole: React.FC<SpeakerConsoleProps> = ({
                 </Box>
               ) : (
                 <Box sx={{ py: 4, textAlign: 'center', color: 'text.secondary' }}>
-                  <Typography variant="body2" sx={{ fontStyle: 'italic' }}>
-                    English translation will appear here in real-time as words are spoken.
+                  <Typography variant="body2" sx={{ color: isDarkTheme ? '#52525B' : '#A1A1AA' }}>
+                    English translation will stream here as words are spoken.
                   </Typography>
                 </Box>
               )}
             </CardContent>
 
-            {/* Bottom Actions: Iconic Google Translate TTS, Copy, and Font style */}
+            {/* Bottom Actions */}
             <Box
               sx={{
                 p: 2,
                 pt: 1.5,
                 borderTop: '1px solid',
-                borderColor: 'divider',
+                borderColor: isDarkTheme ? 'rgba(255, 255, 255, 0.06)' : 'rgba(0, 0, 0, 0.06)',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'space-between',
               }}
             >
               <Stack direction="row" spacing={1}>
-                {/* Listen / TTS Button (Google Translate Signature) */}
-                <Tooltip title="Listen to translation (Text-to-Speech)" arrow>
+                {/* TTS */}
+                <Tooltip title="Listen to translation" arrow>
                   <span>
                     <IconButton
-                      size="medium"
+                      size="small"
                       disabled={!currentDisplayEnglish}
                       onClick={() => speakTranslation(currentDisplayEnglish, 'active')}
                       color={speakingId === 'active' ? 'primary' : 'default'}
                       sx={{
                         border: '1px solid',
-                        borderColor: 'divider',
-                        bgcolor: speakingId === 'active' ? (isDarkTheme ? alpha('#A8C7FA', 0.2) : alpha('#0B57D0', 0.15)) : 'transparent',
+                        borderColor: isDarkTheme ? 'rgba(255, 255, 255, 0.08)' : 'rgba(0, 0, 0, 0.08)',
+                        color: isDarkTheme ? '#A1A1AA' : '#71717A',
                       }}
                     >
                       <VolumeUpIcon fontSize="small" />
@@ -603,17 +637,18 @@ export const SpeakerConsole: React.FC<SpeakerConsoleProps> = ({
                   </span>
                 </Tooltip>
 
-                {/* Copy to Clipboard (Google Translate Signature) */}
-                <Tooltip title="Copy translation to clipboard" arrow>
+                {/* Copy */}
+                <Tooltip title="Copy translation" arrow>
                   <span>
                     <IconButton
-                      size="medium"
+                      size="small"
                       disabled={!currentDisplayEnglish}
                       onClick={() => copyToClipboard(currentDisplayEnglish, 'active')}
                       color={copiedId === 'active' ? 'success' : 'default'}
                       sx={{
                         border: '1px solid',
-                        borderColor: 'divider',
+                        borderColor: isDarkTheme ? 'rgba(255, 255, 255, 0.08)' : 'rgba(0, 0, 0, 0.08)',
+                        color: isDarkTheme ? '#A1A1AA' : '#71717A',
                       }}
                     >
                       {copiedId === 'active' ? <CheckIcon fontSize="small" /> : <ContentCopyIcon fontSize="small" />}
@@ -622,16 +657,19 @@ export const SpeakerConsole: React.FC<SpeakerConsoleProps> = ({
                 </Tooltip>
               </Stack>
 
-              <Stack direction="row" spacing={1} sx={{ alignItems: 'center' }}>
-                <Button
-                  size="small"
-                  variant="outlined"
-                  onClick={() => setFontStyle(fontStyle === 'serif' ? 'sans' : 'serif')}
-                  sx={{ fontSize: '0.75rem', py: 0.5 }}
-                >
-                  Font: {fontStyle === 'serif' ? 'Editorial Serif' : 'Modern Sans'}
-                </Button>
-              </Stack>
+              <Button
+                size="small"
+                variant="text"
+                onClick={() => setFontStyle(fontStyle === 'serif' ? 'sans' : 'serif')}
+                sx={{
+                  fontSize: '0.75rem',
+                  py: 0.5,
+                  color: isDarkTheme ? '#A1A1AA' : '#71717A',
+                  textTransform: 'none',
+                }}
+              >
+                {fontStyle === 'serif' ? 'Serif' : 'Sans'}
+              </Button>
             </Box>
           </Card>
         </Box>
@@ -646,24 +684,29 @@ export const SpeakerConsole: React.FC<SpeakerConsoleProps> = ({
         >
           {/* Wedding & Speech Details */}
           <Paper
-            elevation={1}
+            elevation={0}
             sx={{
               p: 2.5,
-              bgcolor: isDarkTheme ? '#1E1F22' : '#FFFFFF',
+              bgcolor: isDarkTheme ? '#121316' : '#FFFFFF',
               border: '1px solid',
-              borderColor: isDarkTheme ? '#333538' : '#DEE2E6',
+              borderColor: isDarkTheme ? 'rgba(255, 255, 255, 0.08)' : 'rgba(0, 0, 0, 0.08)',
+              borderRadius: 3,
             }}
           >
             <Stack direction="row" sx={{ justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
-              <Typography variant="subtitle2" sx={{ fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em' }}>
-                Wedding Context &amp; Model Specs
+              <Typography variant="caption" sx={{ fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em', color: isDarkTheme ? '#71717A' : '#A1A1AA' }}>
+                Wedding Information
               </Typography>
               <Chip
-                icon={<CheckCircleIcon sx={{ fontSize: '1rem !important' }} />}
-                label="Synced with Backend"
+                icon={<CheckCircleIcon sx={{ fontSize: '0.85rem !important' }} />}
+                label="Ready"
                 size="small"
-                color="success"
                 variant="outlined"
+                color="success"
+                sx={{
+                  height: 20,
+                  fontSize: '0.6875rem',
+                }}
               />
             </Stack>
 
@@ -671,43 +714,43 @@ export const SpeakerConsole: React.FC<SpeakerConsoleProps> = ({
               sx={{
                 display: 'grid',
                 gridTemplateColumns: { xs: '1fr', sm: '1fr 1fr' },
-                gap: 1.5,
+                gap: 2,
                 fontSize: '0.8125rem',
               }}
             >
               <Box>
-                <Typography variant="caption" color="text.secondary">
+                <Typography variant="caption" sx={{ color: isDarkTheme ? '#71717A' : '#A1A1AA', fontSize: '0.7rem' }}>
                   Bride &amp; Groom
                 </Typography>
-                <Typography variant="body2" sx={{ fontWeight: 600 }}>
+                <Typography variant="body2" sx={{ fontWeight: 600, color: isDarkTheme ? '#F4F4F5' : '#18181B' }}>
                   {wedding.bride_name} &amp; {wedding.groom_name}
                 </Typography>
               </Box>
 
               <Box>
-                <Typography variant="caption" color="text.secondary">
+                <Typography variant="caption" sx={{ color: isDarkTheme ? '#71717A' : '#A1A1AA', fontSize: '0.7rem' }}>
                   Venue
                 </Typography>
-                <Typography variant="body2" sx={{ fontWeight: 600 }}>
+                <Typography variant="body2" sx={{ fontWeight: 600, color: isDarkTheme ? '#F4F4F5' : '#18181B' }}>
                   The Stable at Stones of the Yarra Valley
                 </Typography>
               </Box>
 
               <Box>
-                <Typography variant="caption" color="text.secondary">
-                  Live Engine
+                <Typography variant="caption" sx={{ color: isDarkTheme ? '#71717A' : '#A1A1AA', fontSize: '0.7rem' }}>
+                  Active Session
                 </Typography>
-                <Typography variant="body2" sx={{ fontWeight: 600, fontFamily: 'monospace' }}>
-                  {backendConfig?.live_model || 'gemini-3.8-live'} (1-Step Direct)
+                <Typography variant="body2" sx={{ fontWeight: 600, color: isDarkTheme ? '#F4F4F5' : '#18181B' }}>
+                  #{sessionInfo.session_number}: {sessionInfo.session_title}
                 </Typography>
               </Box>
 
               <Box>
-                <Typography variant="caption" color="text.secondary">
-                  Infrastructure
+                <Typography variant="caption" sx={{ color: isDarkTheme ? '#71717A' : '#A1A1AA', fontSize: '0.7rem' }}>
+                  Date
                 </Typography>
-                <Typography variant="body2" sx={{ fontWeight: 600 }}>
-                  {backendConfig?.use_vertex ? 'Google Cloud Vertex AI' : 'Google AI Studio'}
+                <Typography variant="body2" sx={{ fontWeight: 600, color: isDarkTheme ? '#F4F4F5' : '#18181B' }}>
+                  Saturday, 10 October 2026
                 </Typography>
               </Box>
             </Box>
@@ -715,12 +758,13 @@ export const SpeakerConsole: React.FC<SpeakerConsoleProps> = ({
 
           {/* Quick Session Management Actions */}
           <Paper
-            elevation={1}
+            elevation={0}
             sx={{
               p: 2.5,
-              bgcolor: isDarkTheme ? '#1E1F22' : '#FFFFFF',
+              bgcolor: isDarkTheme ? '#121316' : '#FFFFFF',
               border: '1px solid',
-              borderColor: isDarkTheme ? '#333538' : '#DEE2E6',
+              borderColor: isDarkTheme ? 'rgba(255, 255, 255, 0.08)' : 'rgba(0, 0, 0, 0.08)',
+              borderRadius: 3,
               display: 'flex',
               flexDirection: 'column',
               justifyContent: 'space-between',
@@ -728,11 +772,11 @@ export const SpeakerConsole: React.FC<SpeakerConsoleProps> = ({
             }}
           >
             <Box>
-              <Typography variant="subtitle2" sx={{ fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em', mb: 1 }}>
-                Session Actions
+              <Typography variant="caption" sx={{ fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em', color: isDarkTheme ? '#71717A' : '#A1A1AA', display: 'block', mb: 0.5 }}>
+                Session Controls
               </Typography>
-              <Typography variant="caption" color="text.secondary">
-                Manage speech history, export guest files, or clear for next speaker.
+              <Typography variant="caption" sx={{ color: isDarkTheme ? '#52525B' : '#A1A1AA' }}>
+                Export guest transcripts or reset for next speaker.
               </Typography>
             </Box>
 
@@ -741,12 +785,19 @@ export const SpeakerConsole: React.FC<SpeakerConsoleProps> = ({
                 <Button
                   variant="outlined"
                   size="small"
-                  startIcon={<QrCode2Icon />}
+                  startIcon={<QrCode2Icon sx={{ fontSize: '1rem' }} />}
                   onClick={onOpenQrCode}
                   fullWidth
-                  sx={{ justifyContent: 'flex-start', py: 0.75 }}
+                  sx={{
+                    justifyContent: 'flex-start',
+                    py: 0.75,
+                    fontSize: '0.8125rem',
+                    textTransform: 'none',
+                    borderColor: isDarkTheme ? 'rgba(255, 255, 255, 0.1)' : 'rgba(0, 0, 0, 0.1)',
+                    color: isDarkTheme ? '#F4F4F5' : '#18181B',
+                  }}
                 >
-                  Show Guest Mobile QR Code
+                  Guest QR Code
                 </Button>
               )}
 
@@ -754,18 +805,32 @@ export const SpeakerConsole: React.FC<SpeakerConsoleProps> = ({
                 <Button
                   variant="outlined"
                   size="small"
-                  startIcon={<DownloadIcon />}
+                  startIcon={<DownloadIcon sx={{ fontSize: '0.9rem' }} />}
                   onClick={() => exportTranscript('markdown')}
-                  sx={{ flex: 1, py: 0.75 }}
+                  sx={{
+                    flex: 1,
+                    py: 0.6,
+                    fontSize: '0.75rem',
+                    textTransform: 'none',
+                    borderColor: isDarkTheme ? 'rgba(255, 255, 255, 0.1)' : 'rgba(0, 0, 0, 0.1)',
+                    color: isDarkTheme ? '#F4F4F5' : '#18181B',
+                  }}
                 >
                   Export MD
                 </Button>
                 <Button
                   variant="outlined"
                   size="small"
-                  startIcon={<DownloadIcon />}
+                  startIcon={<DownloadIcon sx={{ fontSize: '0.9rem' }} />}
                   onClick={() => exportTranscript('csv')}
-                  sx={{ flex: 1, py: 0.75 }}
+                  sx={{
+                    flex: 1,
+                    py: 0.6,
+                    fontSize: '0.75rem',
+                    textTransform: 'none',
+                    borderColor: isDarkTheme ? 'rgba(255, 255, 255, 0.1)' : 'rgba(0, 0, 0, 0.1)',
+                    color: isDarkTheme ? '#F4F4F5' : '#18181B',
+                  }}
                 >
                   Export CSV
                 </Button>
@@ -774,7 +839,10 @@ export const SpeakerConsole: React.FC<SpeakerConsoleProps> = ({
                     size="small"
                     onClick={clearTranscript}
                     color="error"
-                    sx={{ border: '1px solid', borderColor: 'divider' }}
+                    sx={{
+                      border: '1px solid',
+                      borderColor: isDarkTheme ? 'rgba(255, 255, 255, 0.1)' : 'rgba(0, 0, 0, 0.1)',
+                    }}
                   >
                     <DeleteOutlinedIcon fontSize="small" />
                   </IconButton>
@@ -784,24 +852,25 @@ export const SpeakerConsole: React.FC<SpeakerConsoleProps> = ({
           </Paper>
         </Box>
 
-        {/* Google Translate Conversation / Transcript Timeline Feed */}
+        {/* Conversation / Transcript Timeline Feed */}
         <Card
-          elevation={2}
+          elevation={0}
           sx={{
-            bgcolor: isDarkTheme ? '#1E1F22' : '#FFFFFF',
+            bgcolor: isDarkTheme ? '#121316' : '#FFFFFF',
             border: '1px solid',
-            borderColor: isDarkTheme ? '#333538' : '#DEE2E6',
+            borderColor: isDarkTheme ? 'rgba(255, 255, 255, 0.08)' : 'rgba(0, 0, 0, 0.08)',
+            borderRadius: 3,
           }}
         >
           <CardHeader
             title={
               <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1.5} sx={{ justifyContent: 'space-between', alignItems: { xs: 'flex-start', sm: 'center' } }}>
                 <Box>
-                  <Typography variant="h6" sx={{ fontWeight: 700, fontSize: '1.05rem' }}>
-                    Speech History &amp; Conversation Timeline
+                  <Typography variant="body1" sx={{ fontWeight: 600, color: isDarkTheme ? '#F4F4F5' : '#18181B' }}>
+                    Transcript History
                   </Typography>
-                  <Typography variant="caption" color="text.secondary">
-                    {subtitles.length} finalized phrases in current session
+                  <Typography variant="caption" sx={{ color: isDarkTheme ? '#71717A' : '#A1A1AA' }}>
+                    {subtitles.length} phrases recorded
                   </Typography>
                 </Box>
 
@@ -809,7 +878,7 @@ export const SpeakerConsole: React.FC<SpeakerConsoleProps> = ({
                   {/* Search Filter */}
                   <TextField
                     size="small"
-                    placeholder="Search speeches..."
+                    placeholder="Search..."
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
                     slotProps={{
@@ -822,10 +891,14 @@ export const SpeakerConsole: React.FC<SpeakerConsoleProps> = ({
                       },
                     }}
                     sx={{
-                      width: { xs: 150, sm: 220 },
+                      width: { xs: 140, sm: 200 },
                       '& .MuiOutlinedInput-root': {
                         borderRadius: '999px',
                         fontSize: '0.8125rem',
+                        bgcolor: isDarkTheme ? 'rgba(255, 255, 255, 0.03)' : 'rgba(0, 0, 0, 0.02)',
+                        '& fieldset': {
+                          borderColor: isDarkTheme ? 'rgba(255, 255, 255, 0.08)' : 'rgba(0, 0, 0, 0.08)',
+                        },
                       },
                     }}
                   />
@@ -836,7 +909,10 @@ export const SpeakerConsole: React.FC<SpeakerConsoleProps> = ({
                       size="small"
                       color={feedLayout === 'side-by-side' ? 'primary' : 'default'}
                       onClick={() => setFeedLayout('side-by-side')}
-                      sx={{ border: '1px solid', borderColor: 'divider' }}
+                      sx={{
+                        border: '1px solid',
+                        borderColor: isDarkTheme ? 'rgba(255, 255, 255, 0.08)' : 'rgba(0, 0, 0, 0.08)',
+                      }}
                     >
                       <ViewColumnIcon fontSize="small" />
                     </IconButton>
@@ -846,7 +922,10 @@ export const SpeakerConsole: React.FC<SpeakerConsoleProps> = ({
                       size="small"
                       color={feedLayout === 'stacked' ? 'primary' : 'default'}
                       onClick={() => setFeedLayout('stacked')}
-                      sx={{ border: '1px solid', borderColor: 'divider' }}
+                      sx={{
+                        border: '1px solid',
+                        borderColor: isDarkTheme ? 'rgba(255, 255, 255, 0.08)' : 'rgba(0, 0, 0, 0.08)',
+                      }}
                     >
                       <ViewAgendaIcon fontSize="small" />
                     </IconButton>
@@ -854,7 +933,7 @@ export const SpeakerConsole: React.FC<SpeakerConsoleProps> = ({
                 </Stack>
               </Stack>
             }
-            sx={{ borderBottom: '1px solid', borderColor: 'divider', py: 2 }}
+            sx={{ borderBottom: '1px solid', borderColor: isDarkTheme ? 'rgba(255, 255, 255, 0.06)' : 'rgba(0, 0, 0, 0.06)', py: 2 }}
           />
 
           {/* Scrollable Conversation List */}
@@ -864,16 +943,16 @@ export const SpeakerConsole: React.FC<SpeakerConsoleProps> = ({
               maxHeight: 460,
               overflowY: 'auto',
               p: { xs: 2, sm: 2.5 },
-              bgcolor: isDarkTheme ? '#16181A' : '#F0F4F9',
+              bgcolor: isDarkTheme ? '#090A0B' : '#FAFAFA',
             }}
           >
             {filteredSubtitles.length === 0 && !activePartial ? (
               <Box sx={{ py: 8, textAlign: 'center', color: 'text.secondary' }}>
-                <RecordVoiceOverIcon sx={{ fontSize: 44, opacity: 0.4, mb: 1 }} />
-                <Typography variant="body2" sx={{ fontStyle: 'italic' }}>
+                <RecordVoiceOverIcon sx={{ fontSize: 36, opacity: 0.3, mb: 1 }} />
+                <Typography variant="body2" sx={{ color: isDarkTheme ? '#52525B' : '#A1A1AA' }}>
                   {searchQuery
-                    ? `No speech matches found for "${searchQuery}".`
-                    : 'No speech recorded yet in this session. Start speaking to see live translations.'}
+                    ? `No matches for "${searchQuery}".`
+                    : 'No phrases recorded yet in this session.'}
                 </Typography>
               </Box>
             ) : feedLayout === 'side-by-side' ? (
@@ -885,10 +964,10 @@ export const SpeakerConsole: React.FC<SpeakerConsoleProps> = ({
                     elevation={0}
                     sx={{
                       p: 2,
-                      bgcolor: isDarkTheme ? '#1E1F22' : '#FFFFFF',
+                      bgcolor: isDarkTheme ? '#121316' : '#FFFFFF',
                       border: '1px solid',
-                      borderColor: isDarkTheme ? '#333538' : '#E0E2EC',
-                      borderRadius: 3,
+                      borderColor: isDarkTheme ? 'rgba(255, 255, 255, 0.06)' : 'rgba(0, 0, 0, 0.06)',
+                      borderRadius: 2.5,
                       display: 'grid',
                       gridTemplateColumns: { xs: '1fr', md: '5fr 7fr' },
                       gap: 2,
@@ -898,27 +977,27 @@ export const SpeakerConsole: React.FC<SpeakerConsoleProps> = ({
                     {/* Chinese Left */}
                     <Box>
                       <Stack direction="row" spacing={1} sx={{ alignItems: 'center', mb: 0.5 }}>
-                        <Typography variant="caption" sx={{ fontWeight: 700, color: 'text.secondary' }}>
+                        <Typography variant="caption" sx={{ fontWeight: 600, color: isDarkTheme ? '#71717A' : '#A1A1AA' }}>
                           #{item.id}
                         </Typography>
-                        <Typography variant="caption" sx={{ color: 'text.secondary', fontFamily: 'monospace' }}>
+                        <Typography variant="caption" sx={{ color: isDarkTheme ? '#52525B' : '#D4D4D8', fontFamily: 'monospace' }}>
                           {item.timestamp}
                         </Typography>
                       </Stack>
-                      <Typography variant="body2" sx={{ color: isDarkTheme ? '#D4CDC3' : '#4A453E', lineHeight: 1.5 }}>
+                      <Typography variant="body2" sx={{ color: isDarkTheme ? '#A1A1AA' : '#71717A', lineHeight: 1.6 }}>
                         {item.chinese || '—'}
                       </Typography>
                     </Box>
 
                     {/* English Right */}
-                    <Box sx={{ borderLeft: { md: '1px solid' }, borderColor: 'divider', pl: { md: 2 } }}>
+                    <Box sx={{ borderLeft: { md: '1px solid' }, borderColor: isDarkTheme ? 'rgba(255, 255, 255, 0.06)' : 'rgba(0, 0, 0, 0.06)', pl: { md: 2 } }}>
                       <Stack direction="row" sx={{ justifyContent: 'space-between', alignItems: 'center' }}>
                         <Typography
                           variant="body1"
                           sx={{
                             fontFamily: fontStyle === 'serif' ? '"Playfair Display", serif' : '"Plus Jakarta Sans", sans-serif',
-                            fontWeight: 600,
-                            color: isDarkTheme ? '#FAF8F5' : '#1C1A17',
+                            fontWeight: 500,
+                            color: isDarkTheme ? '#F4F4F5' : '#18181B',
                             lineHeight: 1.5,
                             flex: 1,
                           }}
@@ -927,13 +1006,13 @@ export const SpeakerConsole: React.FC<SpeakerConsoleProps> = ({
                         </Typography>
 
                         <Stack direction="row" spacing={0.5} sx={{ ml: 1 }}>
-                          <Tooltip title="Listen TTS" arrow>
-                            <IconButton size="small" onClick={() => speakTranslation(item.english, item.id)}>
+                          <Tooltip title="Listen" arrow>
+                            <IconButton size="small" onClick={() => speakTranslation(item.english, item.id)} sx={{ color: isDarkTheme ? '#71717A' : '#A1A1AA' }}>
                               <VolumeUpIcon fontSize="small" />
                             </IconButton>
                           </Tooltip>
-                          <Tooltip title="Copy text" arrow>
-                            <IconButton size="small" onClick={() => copyToClipboard(item.english, item.id)}>
+                          <Tooltip title="Copy" arrow>
+                            <IconButton size="small" onClick={() => copyToClipboard(item.english, item.id)} sx={{ color: isDarkTheme ? '#71717A' : '#A1A1AA' }}>
                               {copiedId === item.id ? <CheckIcon fontSize="small" color="success" /> : <ContentCopyIcon fontSize="small" />}
                             </IconButton>
                           </Tooltip>
@@ -942,6 +1021,52 @@ export const SpeakerConsole: React.FC<SpeakerConsoleProps> = ({
                     </Box>
                   </Paper>
                 ))}
+
+                {activePartial && (activePartial.chinese || activePartial.english) && (
+                  <Paper
+                    elevation={0}
+                    sx={{
+                      p: 2,
+                      bgcolor: isDarkTheme ? '#121316' : '#FFFFFF',
+                      border: '1px solid',
+                      borderColor: 'primary.main',
+                      borderRadius: 2.5,
+                      display: 'grid',
+                      gridTemplateColumns: { xs: '1fr', md: '5fr 7fr' },
+                      gap: 2,
+                      alignItems: 'center',
+                    }}
+                  >
+                    <Box>
+                      <Stack direction="row" spacing={1} sx={{ alignItems: 'center', mb: 0.5 }}>
+                        <Box sx={{ width: 6, height: 6, borderRadius: '50%', bgcolor: 'primary.main' }} />
+                        <Typography variant="caption" sx={{ fontWeight: 600, color: 'primary.main' }}>
+                          Live
+                        </Typography>
+                        <Typography variant="caption" sx={{ color: isDarkTheme ? '#52525B' : '#D4D4D8', fontFamily: 'monospace' }}>
+                          {activePartial.timestamp}
+                        </Typography>
+                      </Stack>
+                      <Typography variant="body2" sx={{ color: isDarkTheme ? '#E4E4E7' : '#27272A', lineHeight: 1.6 }}>
+                        {activePartial.chinese || 'Listening...'}
+                      </Typography>
+                    </Box>
+
+                    <Box sx={{ borderLeft: { md: '1px solid' }, borderColor: isDarkTheme ? 'rgba(255, 255, 255, 0.06)' : 'rgba(0, 0, 0, 0.06)', pl: { md: 2 } }}>
+                      <Typography
+                        variant="body1"
+                        sx={{
+                          fontFamily: fontStyle === 'serif' ? '"Playfair Display", serif' : '"Plus Jakarta Sans", sans-serif',
+                          fontWeight: 500,
+                          color: isDarkTheme ? '#F4F4F5' : '#18181B',
+                          lineHeight: 1.5,
+                        }}
+                      >
+                        {activePartial.english || 'Translating...'}
+                      </Typography>
+                    </Box>
+                  </Paper>
+                )}
               </Stack>
             ) : (
               /* Stacked Cards */
@@ -952,35 +1077,35 @@ export const SpeakerConsole: React.FC<SpeakerConsoleProps> = ({
                     elevation={0}
                     sx={{
                       p: 2,
-                      bgcolor: isDarkTheme ? '#1E1F22' : '#FFFFFF',
+                      bgcolor: isDarkTheme ? '#121316' : '#FFFFFF',
                       border: '1px solid',
-                      borderColor: isDarkTheme ? '#333538' : '#E0E2EC',
-                      borderRadius: 3,
+                      borderColor: isDarkTheme ? 'rgba(255, 255, 255, 0.06)' : 'rgba(0, 0, 0, 0.06)',
+                      borderRadius: 2.5,
                     }}
                   >
                     <Stack direction="row" sx={{ justifyContent: 'space-between', alignItems: 'center', mb: 1 }}>
                       <Stack direction="row" spacing={1} sx={{ alignItems: 'center' }}>
-                        <Typography variant="caption" sx={{ fontWeight: 700, color: 'text.secondary' }}>
+                        <Typography variant="caption" sx={{ fontWeight: 600, color: isDarkTheme ? '#71717A' : '#A1A1AA' }}>
                           #{item.id}
                         </Typography>
-                        <Typography variant="caption" sx={{ color: 'text.secondary', fontFamily: 'monospace' }}>
+                        <Typography variant="caption" sx={{ color: isDarkTheme ? '#52525B' : '#D4D4D8', fontFamily: 'monospace' }}>
                           {item.timestamp}
                         </Typography>
                       </Stack>
 
                       <Stack direction="row" spacing={0.5}>
-                        <IconButton size="small" onClick={() => speakTranslation(item.english, item.id)}>
+                        <IconButton size="small" onClick={() => speakTranslation(item.english, item.id)} sx={{ color: isDarkTheme ? '#71717A' : '#A1A1AA' }}>
                           <VolumeUpIcon fontSize="small" />
                         </IconButton>
-                        <IconButton size="small" onClick={() => copyToClipboard(item.english, item.id)}>
+                        <IconButton size="small" onClick={() => copyToClipboard(item.english, item.id)} sx={{ color: isDarkTheme ? '#71717A' : '#A1A1AA' }}>
                           {copiedId === item.id ? <CheckIcon fontSize="small" color="success" /> : <ContentCopyIcon fontSize="small" />}
                         </IconButton>
                       </Stack>
                     </Stack>
 
                     {item.chinese && (
-                      <Typography variant="body2" sx={{ color: 'text.secondary', mb: 1 }}>
-                        🇨🇳 {item.chinese}
+                      <Typography variant="body2" sx={{ color: isDarkTheme ? '#71717A' : '#A1A1AA', mb: 0.75, lineHeight: 1.5 }}>
+                        {item.chinese}
                       </Typography>
                     )}
 
@@ -988,14 +1113,56 @@ export const SpeakerConsole: React.FC<SpeakerConsoleProps> = ({
                       variant="body1"
                       sx={{
                         fontFamily: fontStyle === 'serif' ? '"Playfair Display", serif' : '"Plus Jakarta Sans", sans-serif',
-                        fontWeight: 600,
-                        color: isDarkTheme ? '#FAF8F5' : '#1C1A17',
+                        fontWeight: 500,
+                        color: isDarkTheme ? '#F4F4F5' : '#18181B',
+                        lineHeight: 1.5,
                       }}
                     >
-                      🇬🇧 {item.english}
+                      {item.english}
                     </Typography>
                   </Paper>
                 ))}
+
+                {activePartial && (activePartial.chinese || activePartial.english) && (
+                  <Paper
+                    elevation={0}
+                    sx={{
+                      p: 2,
+                      bgcolor: isDarkTheme ? '#121316' : '#FFFFFF',
+                      border: '1px solid',
+                      borderColor: 'primary.main',
+                      borderRadius: 2.5,
+                    }}
+                  >
+                    <Stack direction="row" spacing={1} sx={{ alignItems: 'center', mb: 1 }}>
+                      <Box sx={{ width: 6, height: 6, borderRadius: '50%', bgcolor: 'primary.main' }} />
+                      <Typography variant="caption" sx={{ fontWeight: 600, color: 'primary.main' }}>
+                        Live
+                      </Typography>
+                      <Typography variant="caption" sx={{ color: isDarkTheme ? '#52525B' : '#D4D4D8', fontFamily: 'monospace' }}>
+                        {activePartial.timestamp}
+                      </Typography>
+                    </Stack>
+
+                    {activePartial.chinese && (
+                      <Typography variant="body2" sx={{ color: isDarkTheme ? '#E4E4E7' : '#27272A', mb: 0.75, lineHeight: 1.5 }}>
+                        {activePartial.chinese}
+                      </Typography>
+                    )}
+
+                    <Typography
+                      variant="body1"
+                      sx={{
+                        fontFamily: fontStyle === 'serif' ? '"Playfair Display", serif' : '"Plus Jakarta Sans", sans-serif',
+                        fontWeight: 500,
+                        color: isDarkTheme ? '#F4F4F5' : '#18181B',
+                        lineHeight: 1.5,
+                      }}
+                    >
+                      {activePartial.english || 'Translating...'}
+                    </Typography>
+                  </Paper>
+                )}
               </Stack>
             )}
           </Box>

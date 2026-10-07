@@ -107,7 +107,6 @@ export function App() {
           connectionStatus={connectionStatus}
           isSessionActive={isSessionActive}
           wedding={wedding}
-          liveModel={backendConfig?.live_model || 'gemini-3.8-live'}
           sessionInfo={sessionInfo}
           onOpenNewSession={() => setIsNewSessionDialogOpen(true)}
           isDark={isDarkTheme}

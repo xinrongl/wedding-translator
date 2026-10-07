@@ -54,7 +54,7 @@ def test_api_health_and_config():
     assert data["status"] == "ok"
     assert data["live_model"] == "gemini-3.8-live"
     assert isinstance(data["use_vertex"], bool)
-    assert data["location"] == "global"
+    assert data["location"] == settings.google_cloud_location
 
     # 2. Config get
     resp = client.get("/api/config")
@@ -167,8 +167,7 @@ async def test_gemini_live_session_lifecycle():
             for e in events
         )
         assert any(
-            e.get("type") == "partial"
-            and "Xinrong and Joy" in e.get("english", "")
+            e.get("type") == "partial" and "Xinrong and Joy" in e.get("english", "")
             for e in events
         )
         assert any(
@@ -244,22 +243,36 @@ def test_live_model_configuration():
 def test_use_vertex_resolution():
     """Verify use_vertex property logic across Accenture vs Personal GCP environments."""
     # 1. Explicit override with GOOGLE_GENAI_USE_VERTEXAI
-    s1 = Settings(google_genai_use_vertexai=True, google_cloud_project="canvas-aviary-302803")
+    s1 = Settings(
+        google_genai_use_vertexai=True, google_cloud_project="canvas-aviary-302803"
+    )
     assert s1.use_vertex is True
 
-    s2 = Settings(google_genai_use_vertexai=False, google_cloud_project="ktzdeir-agbg-anz-gemini-vertex")
+    s2 = Settings(
+        google_genai_use_vertexai=False,
+        google_cloud_project="ktzdeir-agbg-anz-gemini-vertex",
+    )
     assert s2.use_vertex is False
 
     # 2. Auto-detect Accenture Vertex project
-    s3 = Settings(google_genai_use_vertexai=None, google_cloud_project="ktzdeir-agbg-anz-gemini-vertex")
+    s3 = Settings(
+        google_genai_use_vertexai=None,
+        google_cloud_project="ktzdeir-agbg-anz-gemini-vertex",
+    )
     assert s3.use_vertex is True
 
     # 3. Auto-detect personal project
-    s4 = Settings(google_genai_use_vertexai=None, google_cloud_project="canvas-aviary-302803")
+    s4 = Settings(
+        google_genai_use_vertexai=None, google_cloud_project="canvas-aviary-302803"
+    )
     assert s4.use_vertex is False
 
     # 4. Auto-detect API key with non-vertex project
-    s5 = Settings(google_genai_use_vertexai=None, google_cloud_project=None, gemini_api_key="AIzaSyTest")
+    s5 = Settings(
+        google_genai_use_vertexai=None,
+        google_cloud_project=None,
+        gemini_api_key="AIzaSyTest",
+    )
     assert s5.use_vertex is False
 
 
@@ -284,7 +297,9 @@ async def test_session_manager_concurrency():
     assert await sm.acquire_speaker_session() is False
 
     # Record history
-    sm.add_record(SubtitleRecord(id=1, chinese="你好", english="Hello", timestamp="12:00:00"))
+    sm.add_record(
+        SubtitleRecord(id=1, chinese="你好", english="Hello", timestamp="12:00:00")
+    )
     assert len(sm.history) == 1
     assert sm.history[0].english == "Hello"
 
@@ -320,7 +335,10 @@ async def test_broadcast_hub():
 def test_speaker_allowed_emails_set_normalizes():
     """Verify the allowlist is trimmed, lowercased, and drops blanks."""
     s = Settings(speaker_allowed_emails=" Approved@Example.com, second@example.com ,")
-    assert s.speaker_allowed_emails_set == {"approved@example.com", "second@example.com"}
+    assert s.speaker_allowed_emails_set == {
+        "approved@example.com",
+        "second@example.com",
+    }
 
 
 def test_verify_speaker_identity_rejects_missing_token():
@@ -364,3 +382,165 @@ def test_verify_speaker_identity_accepts_approved_account(monkeypatch):
         return_value={"email": "approved@example.com", "email_verified": True},
     ):
         assert verify_speaker_identity("token") == "approved@example.com"
+
+
+@pytest.mark.asyncio
+async def test_gemini_live_barge_in_interruption_preserves_subtitle():
+    """Verify that user barge-in (interrupted=True) finalizes and preserves accumulated speech instead of discarding it."""
+    audio_queue: asyncio.Queue[bytes] = asyncio.Queue()
+    translator = GeminiLiveTranslator()
+
+    mock_resp_input = MagicMock()
+    mock_resp_input.go_away = None
+    mock_resp_input.server_content.interrupted = False
+    mock_resp_input.server_content.interim_input_transcription = None
+    mock_resp_input.server_content.input_transcription.text = (
+        "这个 translation 是不是有用的问题?"
+    )
+    mock_resp_input.server_content.output_transcription = None
+    mock_resp_input.server_content.model_turn = None
+    mock_resp_input.server_content.turn_complete = False
+    mock_resp_input.server_content.generation_complete = False
+
+    mock_resp_trans = MagicMock()
+    mock_resp_trans.go_away = None
+    mock_resp_trans.server_content.interrupted = False
+    mock_resp_trans.server_content.interim_input_transcription = None
+    mock_resp_trans.server_content.input_transcription = None
+    mock_t = MagicMock()
+    mock_t.text = "Is this translation useful?"
+    mock_resp_trans.server_content.output_transcription = mock_t
+    mock_resp_trans.server_content.model_turn = None
+    mock_resp_trans.server_content.turn_complete = False
+    mock_resp_trans.server_content.generation_complete = False
+
+    # Speaker begins next sentence -> barge-in triggered
+    mock_resp_interrupted = MagicMock()
+    mock_resp_interrupted.go_away = None
+    mock_resp_interrupted.server_content.interrupted = True
+    mock_resp_interrupted.server_content.interim_input_transcription = None
+    mock_resp_interrupted.server_content.input_transcription = None
+    mock_resp_interrupted.server_content.output_transcription = None
+    mock_resp_interrupted.server_content.model_turn = None
+    mock_resp_interrupted.server_content.turn_complete = False
+    mock_resp_interrupted.server_content.generation_complete = False
+
+    turn_done = False
+
+    async def mock_receive():
+        nonlocal turn_done
+        if not turn_done:
+            turn_done = True
+            yield mock_resp_input
+            yield mock_resp_trans
+            yield mock_resp_interrupted
+        else:
+            await asyncio.Event().wait()
+
+    mock_session = MagicMock()
+    mock_session.send_realtime_input = AsyncMock()
+    mock_session.send_client_content = AsyncMock()
+    mock_session.receive = mock_receive
+
+    class MockConnectContext:
+        async def __aenter__(self):
+            return mock_session
+
+        async def __aexit__(self, exc_type, exc_val, exc_tb):
+            return None
+
+    with patch.object(
+        translator.client.aio.live, "connect", return_value=MockConnectContext()
+    ):
+        events = []
+
+        async def run_session():
+            async for event in translator.start_session(audio_input_queue=audio_queue):
+                events.append(event)
+                if event.get("type") == "final":
+                    await audio_queue.put(None)
+                    break
+
+        await audio_queue.put(b"\x00\x00" * 1600)
+        await asyncio.wait_for(run_session(), timeout=5.0)
+
+        # Confirm that the interrupted sentence was successfully committed as a FINAL subtitle
+        finals = [e for e in events if e.get("type") == "final"]
+        assert len(finals) == 1
+        assert "translation" in finals[0]["chinese"]
+        assert "useful" in finals[0]["english"]
+
+
+@pytest.mark.asyncio
+async def test_gemini_live_utterance_transition_commits_prior_sentence():
+    """Verify that when a new utterance starts while prior speech is translated, prior sentence is committed."""
+    audio_queue: asyncio.Queue[bytes] = asyncio.Queue()
+    translator = GeminiLiveTranslator()
+
+    mock_resp1 = MagicMock()
+    mock_resp1.go_away = None
+    mock_resp1.server_content.interrupted = False
+    mock_resp1.server_content.interim_input_transcription = None
+    mock_resp1.server_content.input_transcription.text = "句子一"
+    mock_t1 = MagicMock()
+    mock_t1.text = "Sentence One."
+    mock_resp1.server_content.output_transcription = mock_t1
+    mock_resp1.server_content.model_turn = None
+    mock_resp1.server_content.turn_complete = False
+    mock_resp1.server_content.generation_complete = False
+
+    # New sentence arrives without explicit turn_complete
+    mock_resp2 = MagicMock()
+    mock_resp2.go_away = None
+    mock_resp2.server_content.interrupted = False
+    mock_interim = MagicMock()
+    mock_interim.text = "句子二开始说话"
+    mock_resp2.server_content.interim_input_transcription = mock_interim
+    mock_resp2.server_content.input_transcription = None
+    mock_resp2.server_content.output_transcription = None
+    mock_resp2.server_content.model_turn = None
+    mock_resp2.server_content.turn_complete = False
+    mock_resp2.server_content.generation_complete = False
+
+    turn_done = False
+
+    async def mock_receive():
+        nonlocal turn_done
+        if not turn_done:
+            turn_done = True
+            yield mock_resp1
+            yield mock_resp2
+        else:
+            await asyncio.Event().wait()
+
+    mock_session = MagicMock()
+    mock_session.send_realtime_input = AsyncMock()
+    mock_session.send_client_content = AsyncMock()
+    mock_session.receive = mock_receive
+
+    class MockConnectContext:
+        async def __aenter__(self):
+            return mock_session
+
+        async def __aexit__(self, exc_type, exc_val, exc_tb):
+            return None
+
+    with patch.object(
+        translator.client.aio.live, "connect", return_value=MockConnectContext()
+    ):
+        events = []
+
+        async def run_session():
+            async for event in translator.start_session(audio_input_queue=audio_queue):
+                events.append(event)
+                if event.get("type") == "final":
+                    await audio_queue.put(None)
+                    break
+
+        await audio_queue.put(b"\x00\x00" * 1600)
+        await asyncio.wait_for(run_session(), timeout=5.0)
+
+        finals = [e for e in events if e.get("type") == "final"]
+        assert len(finals) == 1
+        assert finals[0]["chinese"] == "句子一"
+        assert finals[0]["english"] == "Sentence One."

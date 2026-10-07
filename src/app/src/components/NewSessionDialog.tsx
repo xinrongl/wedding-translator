@@ -97,7 +97,7 @@ export const NewSessionDialog: React.FC<NewSessionDialogProps> = ({
                 New Translation Session
               </Typography>
               <Typography variant="caption" color="text.secondary">
-                Google Translate-style live speech interpretation
+                Start a fresh translation session for the next speech
               </Typography>
             </Box>
           </Stack>

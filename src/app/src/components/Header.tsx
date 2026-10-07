@@ -29,7 +29,6 @@ import FullscreenExitIcon from '@mui/icons-material/FullscreenExit';
 import AddCircleOutlinedIcon from '@mui/icons-material/AddCircleOutlined';
 import TranslateIcon from '@mui/icons-material/Translate';
 import RadioIcon from '@mui/icons-material/Radio';
-import ArrowForwardIcon from '@mui/icons-material/ArrowForward';
 import ArrowDropDownIcon from '@mui/icons-material/ArrowDropDown';
 
 import type { ConnectionStatus } from '../hooks/useLiveSubtitles';
@@ -42,7 +41,6 @@ interface HeaderProps {
   isSessionActive: boolean;
   sessionInfo: TranslationSessionInfo;
   wedding: WeddingContextData;
-  liveModel?: string;
   isDark?: boolean;
   onToggleTheme?: () => void;
   onOpenQrCode: () => void;
@@ -56,7 +54,6 @@ export const Header: React.FC<HeaderProps> = ({
   isSessionActive,
   sessionInfo,
   wedding,
-  liveModel = 'Gemini 3.8 Live',
   isDark = true,
   onToggleTheme,
   onOpenQrCode,
@@ -88,12 +85,12 @@ export const Header: React.FC<HeaderProps> = ({
       elevation={0}
       sx={{
         bgcolor: isDark
-          ? alpha('#121316', 0.94)
-          : alpha('#F8FAFD', 0.94),
+          ? alpha('#090A0B', 0.92)
+          : alpha('#FAFAFA', 0.92),
         backdropFilter: 'blur(16px)',
         borderBottom: '1px solid',
-        borderColor: isDark ? 'rgba(255, 255, 255, 0.08)' : '#E0E2EC',
-        color: isDark ? '#E2E2E6' : '#1F1F1F',
+        borderColor: isDark ? 'rgba(255, 255, 255, 0.08)' : 'rgba(0, 0, 0, 0.07)',
+        color: isDark ? '#F4F4F5' : '#18181B',
         zIndex: theme.zIndex.drawer + 1,
       }}
     >
@@ -101,29 +98,29 @@ export const Header: React.FC<HeaderProps> = ({
         sx={{
           justifyContent: 'space-between',
           px: { xs: 2, sm: 3, md: 4 },
-          py: 0.75,
-          minHeight: { xs: 58, sm: 66 },
+          py: 0.5,
+          minHeight: { xs: 54, sm: 60 },
           gap: 1.5,
         }}
       >
-        {/* Brand & Venue Logo */}
-        <Stack direction="row" spacing={1.75} sx={{ alignItems: 'center', minWidth: 0, flexShrink: 1 }}>
+        {/* Brand & Venue Title */}
+        <Stack direction="row" spacing={1.5} sx={{ alignItems: 'center', minWidth: 0, flexShrink: 1 }}>
           <Box
             sx={{
-              width: 38,
-              height: 38,
+              width: 32,
+              height: 32,
               borderRadius: '50%',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
-              border: '1.5px solid',
-              borderColor: isDark ? 'rgba(168, 199, 250, 0.4)' : 'rgba(11, 87, 208, 0.25)',
-              bgcolor: isDark ? '#1E1F22' : '#D3E3FD',
-              color: isDark ? '#A8C7FA' : '#0B57D0',
+              border: '1px solid',
+              borderColor: isDark ? 'rgba(255, 255, 255, 0.12)' : 'rgba(0, 0, 0, 0.1)',
+              bgcolor: isDark ? 'rgba(255, 255, 255, 0.05)' : 'rgba(0, 0, 0, 0.03)',
+              color: isDark ? '#F4F4F5' : '#18181B',
               flexShrink: 0,
             }}
           >
-            <TranslateIcon sx={{ fontSize: '1.25rem' }} />
+            <TranslateIcon sx={{ fontSize: '1.05rem' }} />
           </Box>
 
           <Box sx={{ minWidth: 0 }}>
@@ -132,133 +129,112 @@ export const Header: React.FC<HeaderProps> = ({
                 variant="subtitle2"
                 noWrap
                 sx={{
-                  fontFamily: '"Outfit", "Google Sans", sans-serif',
-                  fontWeight: 700,
-                  fontSize: { xs: '0.85rem', sm: '0.95rem' },
+                  fontFamily: '"Outfit", sans-serif',
+                  fontWeight: 600,
+                  fontSize: { xs: '0.84rem', sm: '0.9rem' },
                   letterSpacing: '-0.01em',
                 }}
               >
                 Stones of the Yarra Valley
               </Typography>
-              <Chip
-                label="The Stable"
-                size="small"
+              <Typography
+                variant="caption"
                 sx={{
-                  display: { xs: 'none', sm: 'inline-flex' },
-                  height: 20,
-                  fontSize: '0.625rem',
-                  textTransform: 'uppercase',
-                  letterSpacing: '0.08em',
-                  fontWeight: 700,
-                  bgcolor: isDark ? '#282A2E' : '#E9EEF6',
-                  color: isDark ? '#C4C6D0' : '#444746',
-                  border: '1px solid',
-                  borderColor: isDark ? 'rgba(255, 255, 255, 0.1)' : '#E0E2EC',
+                  display: { xs: 'none', sm: 'inline-block' },
+                  color: 'text.secondary',
+                  fontSize: '0.72rem',
                 }}
-              />
+              >
+                • The Stable
+              </Typography>
             </Stack>
 
-            <Stack direction="row" spacing={1} sx={{ alignItems: 'center', mt: 0.1 }}>
+            <Stack direction="row" spacing={0.75} sx={{ alignItems: 'center' }}>
               <Typography
                 variant="caption"
                 noWrap
                 sx={{
-                  fontFamily: '"Outfit", "Google Sans", sans-serif',
-                  color: isDark ? '#C4C6D0' : '#444746',
-                  fontSize: '0.75rem',
+                  color: 'text.secondary',
+                  fontSize: '0.72rem',
                 }}
               >
-                {wedding.bride_name} &amp; {wedding.groom_name}’s Wedding
-              </Typography>
-              <Typography
-                variant="caption"
-                sx={{
-                  display: { xs: 'none', md: 'inline' },
-                  color: isDark ? '#A8C7FA' : '#0B57D0',
-                  fontWeight: 600,
-                  fontSize: '0.6875rem',
-                  letterSpacing: '0.04em',
-                  textTransform: 'uppercase',
-                }}
-              >
-                • Live Interpretation
+                {wedding.bride_name} &amp; {wedding.groom_name}
               </Typography>
             </Stack>
           </Box>
         </Stack>
 
-        {/* Center: Desktop Navigation Tabs & Google Language Pill */}
-        <Stack
-          direction="row"
-          spacing={1.5}
+        {/* Center: Desktop Navigation Segmented Pill */}
+        <Box
           sx={{
-            alignItems: 'center',
             display: { xs: 'none', md: 'flex' },
+            alignItems: 'center',
+            p: 0.5,
+            borderRadius: '999px',
+            bgcolor: isDark ? 'rgba(255, 255, 255, 0.04)' : 'rgba(0, 0, 0, 0.04)',
+            border: '1px solid',
+            borderColor: isDark ? 'rgba(255, 255, 255, 0.08)' : 'rgba(0, 0, 0, 0.06)',
           }}
         >
-          {/* Google Translate Language Pill */}
-          <Box
-            sx={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: 0.75,
-              px: 1.75,
-              py: 0.5,
-              borderRadius: '999px',
-              bgcolor: isDark ? '#1E1F22' : '#F0F4F9',
-              border: '1px solid',
-              borderColor: isDark ? 'rgba(255, 255, 255, 0.1)' : '#E0E2EC',
-              fontSize: '0.75rem',
-            }}
-          >
-            <TranslateIcon sx={{ fontSize: '0.95rem', color: isDark ? '#A8C7FA' : '#0B57D0' }} />
-            <Typography variant="caption" sx={{ fontWeight: 600, color: isDark ? '#E2E2E6' : '#1F1F1F' }}>
-              🇨🇳 普通话
-            </Typography>
-            <ArrowForwardIcon sx={{ fontSize: '0.75rem', color: 'text.secondary', opacity: 0.6 }} />
-            <Typography variant="caption" sx={{ fontWeight: 600, color: isDark ? '#E2E2E6' : '#1F1F1F' }}>
-              🇬🇧 English
-            </Typography>
-          </Box>
-
-          {/* Navigation Tabs (Projector / Speaker / Guest) */}
           <Tabs
             value={currentView}
             onChange={(_, val) => onSelectView(val)}
             textColor="inherit"
             sx={{
-              minHeight: 40,
+              minHeight: 32,
               '& .MuiTabs-flexContainer': { gap: 0.5 },
               '& .MuiTabs-indicator': {
-                backgroundColor: isDark ? '#A8C7FA' : '#0B57D0',
-                height: 3,
-                borderRadius: '3px 3px 0 0',
+                display: 'none',
               },
             }}
           >
             <Tab
               value="mobile"
-              icon={<PhoneIphoneIcon sx={{ fontSize: '1rem !important' }} />}
+              icon={<PhoneIphoneIcon sx={{ fontSize: '0.9rem !important' }} />}
               iconPosition="start"
               label="Guest View"
-              sx={{ minHeight: 40, px: 1.75 }}
+              sx={{
+                minHeight: 32,
+                px: 1.75,
+                borderRadius: '999px',
+                fontSize: '0.78rem',
+                fontWeight: currentView === 'mobile' ? 600 : 450,
+                bgcolor: currentView === 'mobile' ? (isDark ? '#F4F4F5' : '#18181B') : 'transparent',
+                color: currentView === 'mobile' ? (isDark ? '#090A0B !important' : '#FFFFFF !important') : 'text.secondary',
+              }}
             />
             <Tab
               value="speaker"
-              icon={<MicIcon sx={{ fontSize: '1rem !important' }} />}
+              icon={<MicIcon sx={{ fontSize: '0.9rem !important' }} />}
               iconPosition="start"
               label="Speaker Deck"
-              sx={{ minHeight: 40, px: 1.75 }}
+              sx={{
+                minHeight: 32,
+                px: 1.75,
+                borderRadius: '999px',
+                fontSize: '0.78rem',
+                fontWeight: currentView === 'speaker' ? 600 : 450,
+                bgcolor: currentView === 'speaker' ? (isDark ? '#F4F4F5' : '#18181B') : 'transparent',
+                color: currentView === 'speaker' ? (isDark ? '#090A0B !important' : '#FFFFFF !important') : 'text.secondary',
+              }}
             />
             <Tab
               value="projector"
-              icon={<DesktopWindowsIcon sx={{ fontSize: '1rem !important' }} />}
+              icon={<DesktopWindowsIcon sx={{ fontSize: '0.9rem !important' }} />}
               iconPosition="start"
               label="Projector"
-              sx={{ minHeight: 40, px: 1.75 }}
+              sx={{
+                minHeight: 32,
+                px: 1.75,
+                borderRadius: '999px',
+                fontSize: '0.78rem',
+                fontWeight: currentView === 'projector' ? 600 : 450,
+                bgcolor: currentView === 'projector' ? (isDark ? '#F4F4F5' : '#18181B') : 'transparent',
+                color: currentView === 'projector' ? (isDark ? '#090A0B !important' : '#FFFFFF !important') : 'text.secondary',
+              }}
             />
           </Tabs>
-        </Stack>
+        </Box>
 
         {/* Mobile View Selector Button & Dropdown Menu */}
         <Box sx={{ display: { xs: 'flex', md: 'none' }, alignItems: 'center' }}>
@@ -336,20 +312,19 @@ export const Header: React.FC<HeaderProps> = ({
                 variant="contained"
                 size="small"
                 onClick={() => onSelectView('speaker')}
-                startIcon={<MicIcon sx={{ fontSize: '1rem !important' }} />}
+                startIcon={<MicIcon sx={{ fontSize: '0.95rem !important' }} />}
                 sx={{
                   fontWeight: 600,
-                  fontSize: '0.75rem',
-                  py: 0.65,
+                  fontSize: '0.76rem',
+                  py: 0.5,
                   px: { xs: 1.25, sm: 1.75 },
                   borderRadius: '999px',
-                  bgcolor: isDark ? '#A8C7FA' : '#0B57D0',
-                  color: isDark ? '#041E49' : '#FFFFFF',
-                  boxShadow: isDark
-                    ? '0 2px 10px rgba(168,199,250,0.3)'
-                    : '0 2px 10px rgba(11,87,208,0.3)',
+                  bgcolor: isDark ? '#F4F4F5' : '#18181B',
+                  color: isDark ? '#090A0B' : '#FFFFFF',
+                  boxShadow: 'none',
                   '&:hover': {
-                    bgcolor: isDark ? '#D3E3FD' : '#0842A0',
+                    bgcolor: isDark ? '#FFFFFF' : '#27272A',
+                    boxShadow: 'none',
                   },
                 }}
               >
@@ -367,17 +342,17 @@ export const Header: React.FC<HeaderProps> = ({
           <Tooltip title="Create a new translation session for the next speech or speaker" arrow>
             <Button
               variant={currentView === 'speaker' ? 'contained' : 'outlined'}
-              color="primary"
               size="small"
               onClick={onOpenNewSession}
-              startIcon={<AddCircleOutlinedIcon />}
+              startIcon={<AddCircleOutlinedIcon sx={{ fontSize: '0.95rem !important' }} />}
               sx={{
                 fontWeight: 600,
-                fontSize: '0.75rem',
-                py: 0.65,
+                fontSize: '0.76rem',
+                py: 0.5,
                 px: { xs: 1.25, sm: 1.75 },
                 borderRadius: '999px',
-                borderColor: isDark ? 'rgba(168, 199, 250, 0.4)' : 'rgba(11, 87, 208, 0.3)',
+                borderColor: isDark ? 'rgba(255, 255, 255, 0.15)' : 'rgba(0, 0, 0, 0.15)',
+                color: isDark ? '#F4F4F5' : '#18181B',
               }}
             >
               <Box component="span" sx={{ display: { xs: 'none', sm: 'inline' } }}>
@@ -396,39 +371,34 @@ export const Header: React.FC<HeaderProps> = ({
             sx={{
               display: { xs: 'none', lg: 'inline-flex' },
               maxWidth: 200,
-              bgcolor: isDark ? '#282A2E' : '#E9EEF6',
-              color: isDark ? '#E2E2E6' : '#1F1F1F',
+              bgcolor: isDark ? 'rgba(255, 255, 255, 0.05)' : 'rgba(0, 0, 0, 0.04)',
+              color: isDark ? '#D4D4D8' : '#3F3F46',
               border: '1px solid',
-              borderColor: isDark ? 'rgba(255, 255, 255, 0.1)' : '#E0E2EC',
+              borderColor: isDark ? 'rgba(255, 255, 255, 0.08)' : 'rgba(0, 0, 0, 0.06)',
               fontWeight: 500,
-              fontSize: '0.6875rem',
+              fontSize: '0.72rem',
             }}
           />
 
           {/* Live On Air Beacon */}
           {isSessionActive && (
             <Chip
-              icon={<RadioIcon sx={{ fontSize: '0.9rem !important', animation: 'pulse 1.5s infinite' }} />}
+              icon={<RadioIcon sx={{ fontSize: '0.85rem !important' }} />}
               label="On Air"
               size="small"
               color="error"
               variant="filled"
               sx={{
-                fontWeight: 700,
+                fontWeight: 600,
                 fontSize: '0.6875rem',
                 textTransform: 'uppercase',
-                letterSpacing: '0.06em',
-                animation: 'pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite',
-                '@keyframes pulse': {
-                  '0%, 100%': { opacity: 1 },
-                  '50%': { opacity: 0.7 },
-                },
+                letterSpacing: '0.04em',
               }}
             />
           )}
 
           {/* Connection Indicator */}
-          <Tooltip title={`WebSocket: ${connectionStatus} (${liveModel})`} arrow>
+          <Tooltip title={connectionStatus === 'connected' ? 'Live Stream Connected' : `Connection: ${connectionStatus}`} arrow>
             <Box
               sx={{
                 display: 'flex',
@@ -437,27 +407,23 @@ export const Header: React.FC<HeaderProps> = ({
                 px: 1.25,
                 py: 0.5,
                 borderRadius: '999px',
-                bgcolor: isDark ? '#1E1F22' : '#F0F4F9',
+                bgcolor: isDark ? 'rgba(255, 255, 255, 0.04)' : 'rgba(0, 0, 0, 0.04)',
                 border: '1px solid',
-                borderColor: isDark ? 'rgba(255, 255, 255, 0.1)' : '#E0E2EC',
+                borderColor: isDark ? 'rgba(255, 255, 255, 0.08)' : 'rgba(0, 0, 0, 0.06)',
                 fontSize: '0.6875rem',
               }}
             >
               <Box
                 sx={{
-                  width: 8,
-                  height: 8,
+                  width: 7,
+                  height: 7,
                   borderRadius: '50%',
                   bgcolor:
                     connectionStatus === 'connected'
-                      ? '#1E8E3E'
+                      ? '#22C55E'
                       : connectionStatus === 'connecting'
-                      ? '#FBBC04'
-                      : '#EA4335',
-                  boxShadow:
-                    connectionStatus === 'connected'
-                      ? '0 0 6px #34A853'
-                      : 'none',
+                      ? '#EAB308'
+                      : '#EF4444',
                 }}
               />
               <Typography
@@ -465,7 +431,9 @@ export const Header: React.FC<HeaderProps> = ({
                 sx={{
                   display: { xs: 'none', xl: 'inline' },
                   textTransform: 'capitalize',
-                  fontWeight: 600,
+                  fontWeight: 500,
+                  fontSize: '0.7rem',
+                  color: 'text.secondary',
                 }}
               >
                 {connectionStatus}

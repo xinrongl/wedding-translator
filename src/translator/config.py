@@ -204,7 +204,11 @@ class Settings(BaseSettings):
             return self.google_genai_use_vertexai
         if self.google_cloud_project:
             proj = self.google_cloud_project.lower()
-            if "vertex" in proj or "accenture" in proj or proj == "ktzdeir-agbg-anz-gemini-vertex":
+            if (
+                "vertex" in proj
+                or "accenture" in proj
+                or proj == "ktzdeir-agbg-anz-gemini-vertex"
+            ):
                 return True
             return not (proj == "canvas-aviary-302803" or bool(self.gemini_api_key))
         return False
@@ -224,7 +228,11 @@ class Settings(BaseSettings):
     @property
     def speaker_allowed_emails_set(self) -> set[str]:
         """Normalized (trimmed, lowercased) set of emails allowed to open /ws/speaker."""
-        return {e.strip().lower() for e in self.speaker_allowed_emails.split(",") if e.strip()}
+        return {
+            e.strip().lower()
+            for e in self.speaker_allowed_emails.split(",")
+            if e.strip()
+        }
 
     # Gemini 3.8 Live 1-Step Model
     live_model: str = Field(
@@ -259,6 +267,31 @@ class Settings(BaseSettings):
         default=0.0,
         alias="TEMPERATURE",
         description="Sampling temperature for translation determinism (0.0 = maximum acoustic grounding)",
+    )
+    echo_target_language: bool = Field(
+        default=True,
+        alias="ECHO_TARGET_LANGUAGE",
+        description="Whether to echo/parrot input speech already in the target language (e.g. English code-switching)",
+    )
+    enable_context_compression: bool = Field(
+        default=True,
+        alias="ENABLE_CONTEXT_COMPRESSION",
+        description="Enable sliding-window context compression to remove the 15-minute uncompressed session limit",
+    )
+    enable_session_resumption: bool = Field(
+        default=True,
+        alias="ENABLE_SESSION_RESUMPTION",
+        description="Enable automatic session resumption tokens to survive socket drops",
+    )
+    enable_audio_broadcast: bool = Field(
+        default=False,
+        alias="ENABLE_AUDIO_BROADCAST",
+        description="Whether to broadcast translated 24kHz synthesized audio frames to audience subscribers",
+    )
+    vad_silence_duration_ms: int = Field(
+        default=240,
+        alias="VAD_SILENCE_DURATION_MS",
+        description="Voice activity detection silence threshold in milliseconds for snappy turn detection",
     )
 
     # Wedding Context

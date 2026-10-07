@@ -126,8 +126,8 @@ export class AudioCaptureService {
       // 3. Setup Web Audio API pipeline with native 16kHz hardware resampling
       const AudioCtx = window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
       try {
-        // Modern Chrome/Safari/Edge natively resample mic input to 16kHz via OS-level bandlimited sinc filter
-        this.audioContext = new AudioCtx({ sampleRate: 16000 });
+        // Modern Chrome/Safari/Edge natively resample mic input to 16kHz with interactive low latency
+        this.audioContext = new AudioCtx({ sampleRate: 16000, latencyHint: 'interactive' });
       } catch {
         this.audioContext = new AudioCtx();
       }
@@ -135,8 +135,8 @@ export class AudioCaptureService {
 
       this.sourceNode = this.audioContext.createMediaStreamSource(this.mediaStream);
 
-      // ScriptProcessorNode bufferSize = 2048 (~42ms at 48kHz, ~128ms at 16kHz) for lower capture latency
-      this.processor = this.audioContext.createScriptProcessor(2048, 1, 1);
+      // ScriptProcessorNode bufferSize = 1024 (~64ms at 16kHz) for ultra-low streaming latency
+      this.processor = this.audioContext.createScriptProcessor(1024, 1, 1);
 
       this.processor.onaudioprocess = (e: AudioProcessingEvent) => {
         if (!this.isRecording || this.isMuted) {
@@ -222,6 +222,19 @@ export class AudioCaptureService {
 
     if (this.callbacks.onAudioLevel) this.callbacks.onAudioLevel(0);
     if (this.callbacks.onStateChange) this.callbacks.onStateChange(false);
+  }
+
+  /**
+   * Signal stream end / turn boundary to trigger Gemini Live (audio_stream_end=True).
+   */
+  public sendStreamEnd(): void {
+    if (this.websocket && this.websocket.readyState === WebSocket.OPEN) {
+      try {
+        this.websocket.send(JSON.stringify({ type: 'stream_end' }));
+      } catch (err) {
+        console.debug('Failed to send stream_end over WebSocket:', err);
+      }
+    }
   }
 
   /**

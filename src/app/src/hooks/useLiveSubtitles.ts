@@ -111,13 +111,21 @@ export function useLiveSubtitles() {
           case 'partial':
           case 'interim':
             if (data.chinese !== undefined || data.english !== undefined) {
-              setActivePartial({
-                id: data.id ?? Date.now(),
-                chinese: data.chinese ?? '',
-                english: data.english ?? '',
-                timestamp: data.timestamp ?? new Date().toLocaleTimeString(),
+              setActivePartial((prev) => ({
+                id: data.id ?? prev?.id ?? Date.now(),
+                chinese:
+                  data.chinese !== undefined && data.chinese !== ''
+                    ? data.chinese
+                    : (prev?.chinese ?? ''),
+                english:
+                  data.english !== undefined && data.english !== ''
+                    ? data.english
+                    : (prev?.english ?? ''),
+                timestamp:
+                  data.timestamp ?? prev?.timestamp ?? new Date().toLocaleTimeString(),
                 isPartial: true,
-              });
+                is_interim: data.is_interim ?? false,
+              }));
             }
             break;
 
@@ -131,11 +139,20 @@ export function useLiveSubtitles() {
                 timestamp: data.timestamp ?? new Date().toLocaleTimeString(),
                 isPartial: false,
               };
-              setSubtitles((prev) => [...prev, newRecord]);
+              setSubtitles((prev) => {
+                const existingIndex = prev.findIndex((s) => s.id === newRecord.id);
+                if (existingIndex >= 0) {
+                  const updated = [...prev];
+                  updated[existingIndex] = newRecord;
+                  return updated;
+                }
+                return [...prev, newRecord];
+              });
             }
             break;
 
           case 'interrupted':
+            // Model detected user interruption / barge-in. Clear live partial; backend finalizes if applicable.
             setActivePartial(null);
             break;
 
