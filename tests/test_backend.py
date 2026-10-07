@@ -568,3 +568,20 @@ def test_speaker_ws_rejected_without_id_token(monkeypatch):
         with pytest.raises(WebSocketDisconnect) as exc:
             ws.receive_text()
     assert exc.value.code == 4401
+
+
+def test_speaker_session_released_when_translator_init_fails(monkeypatch):
+    """A Gemini client init failure must not leave the speaker lock held (would 4409 every later speaker)."""
+    from starlette.websockets import WebSocketDisconnect
+
+    from translator.server import session_manager
+
+    monkeypatch.setattr(settings, "google_oauth_client_id", "client-id.apps.googleusercontent.com")
+    monkeypatch.setattr("translator.server.verify_speaker_identity", lambda token: "approved@example.com")
+    monkeypatch.setattr("translator.server.GeminiLiveTranslator", MagicMock(side_effect=ValueError("No API key")))
+    client = TestClient(app)
+    with client.websocket_connect("/ws/speaker?id_token=t") as ws:
+        with pytest.raises(WebSocketDisconnect) as exc:
+            ws.receive_text()
+    assert exc.value.code == 1011
+    assert session_manager.is_active is False

@@ -435,7 +435,14 @@ async def websocket_speaker(websocket: WebSocket):
     audio_queue: asyncio.Queue[bytes] = asyncio.Queue()
     text_queue: asyncio.Queue[str] = asyncio.Queue()
     control_queue: asyncio.Queue[str] = asyncio.Queue()
-    translator = GeminiLiveTranslator()
+    try:
+        translator = GeminiLiveTranslator()
+    except Exception:
+        # Release the lock before bailing out, otherwise every later speaker gets 4409.
+        logger.exception("Failed to initialize Gemini client for speaker session")
+        await session_manager.release_speaker_session()
+        await websocket.close(code=1011, reason="Translation backend is misconfigured")
+        return
 
     async def audio_interrupt_callback() -> None:
         await hub.broadcast({"type": "interrupted"})
