@@ -22,6 +22,7 @@ import type {
   SubtitleFontStyle,
   TranslationSessionInfo,
 } from '../types';
+import { StreamingSubtitleText } from './StreamingSubtitleText';
 
 interface ProjectorViewProps {
   subtitles: SubtitleItem[];
@@ -546,7 +547,13 @@ export const ProjectorView: React.FC<ProjectorViewProps> = ({
                             isDarkTheme ? 'text-stone-300' : 'text-stone-700'
                           } ${fontSizes.chineseSplit}`}
                         >
-                          {activePartial.chinese || (
+                          {activePartial.chinese ? (
+                            <StreamingSubtitleText
+                              text={activePartial.chinese}
+                              isChinese
+                              showCursor={false}
+                            />
+                          ) : (
                             <span className="italic text-stone-500">Listening...</span>
                           )}
                         </p>
@@ -565,8 +572,12 @@ export const ProjectorView: React.FC<ProjectorViewProps> = ({
                             isDarkTheme ? 'text-[#F4F4F5]' : 'text-[#18181B]'
                           }`}
                         >
-                          <span>{activePartial.english}</span>
-                          <span className="inline-block w-0.5 h-6 ml-1.5 align-middle bg-primary-main animate-pulse" />
+                          <StreamingSubtitleText
+                            text={activePartial.english}
+                            isChinese={false}
+                            showCursor
+                            cursorColor="#10B981"
+                          />
                         </p>
                       </div>
                     </div>
@@ -587,7 +598,11 @@ export const ProjectorView: React.FC<ProjectorViewProps> = ({
                           isDarkTheme ? 'text-stone-300' : 'text-stone-700'
                         } ${fontSizes.chineseStacked}`}
                       >
-                        {activePartial.chinese}
+                        <StreamingSubtitleText
+                          text={activePartial.chinese}
+                          isChinese
+                          showCursor={false}
+                        />
                       </p>
                     )}
 
@@ -601,8 +616,12 @@ export const ProjectorView: React.FC<ProjectorViewProps> = ({
                           isDarkTheme ? 'text-[#F4F4F5]' : 'text-[#18181B]'
                         }`}
                       >
-                        <span>{activePartial.english}</span>
-                        <span className="inline-block w-0.5 h-6 ml-1.5 align-middle bg-primary-main animate-pulse" />
+                        <StreamingSubtitleText
+                          text={activePartial.english}
+                          isChinese={false}
+                          showCursor
+                          cursorColor="#10B981"
+                        />
                       </p>
                     </div>
                   </>
@@ -618,8 +637,12 @@ export const ProjectorView: React.FC<ProjectorViewProps> = ({
                         isDarkTheme ? 'text-[#F4F4F5]' : 'text-[#18181B]'
                       }`}
                     >
-                      <span>{activePartial.english}</span>
-                      <span className="inline-block w-0.5 h-6 ml-1.5 align-middle bg-primary-main animate-pulse" />
+                      <StreamingSubtitleText
+                        text={activePartial.english}
+                        isChinese={false}
+                        showCursor
+                        cursorColor="#10B981"
+                      />
                     </p>
                   </>
                 )}

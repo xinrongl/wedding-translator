@@ -37,6 +37,7 @@ import CheckCircleIcon from '@mui/icons-material/CheckCircle';
 import { AudioCaptureService, resolveWsUrl } from '../services/audioCapture';
 import { decodeGoogleIdToken, loadGoogleIdentityScript, type GoogleIdentityClaims } from '../services/googleAuth';
 import type { BackendConfig, SubtitleItem, SubtitleFontStyle, TranslationSessionInfo, WeddingContextData } from '../types';
+import { StreamingSubtitleText } from './StreamingSubtitleText';
 
 interface SpeakerConsoleProps {
   subtitles: SubtitleItem[];
@@ -419,7 +420,15 @@ export const SpeakerConsole: React.FC<SpeakerConsoleProps> = ({
                     fontFamily: '"Plus Jakarta Sans", sans-serif',
                   }}
                 >
-                  {currentDisplayChinese}
+                  {activePartial ? (
+                    <StreamingSubtitleText
+                      text={currentDisplayChinese}
+                      isChinese
+                      showCursor={false}
+                    />
+                  ) : (
+                    currentDisplayChinese
+                  )}
                 </Typography>
               ) : (
                 <Box sx={{ py: 4, textAlign: 'center', color: 'text.secondary' }}>
@@ -575,24 +584,15 @@ export const SpeakerConsole: React.FC<SpeakerConsoleProps> = ({
                       color: isDarkTheme ? '#F4F4F5' : '#18181B',
                     }}
                   >
-                    {currentDisplayEnglish}
-                    {activePartial && (
-                      <Box
-                        component="span"
-                        sx={{
-                          display: 'inline-block',
-                          width: 2,
-                          height: 18,
-                          bgcolor: 'primary.main',
-                          ml: 0.75,
-                          verticalAlign: 'middle',
-                          animation: 'blink 1s infinite',
-                          '@keyframes blink': {
-                            '0%, 100%': { opacity: 1 },
-                            '50%': { opacity: 0 },
-                          },
-                        }}
+                    {activePartial ? (
+                      <StreamingSubtitleText
+                        text={currentDisplayEnglish}
+                        isChinese={false}
+                        showCursor
+                        cursorColor={isDarkTheme ? '#70A5F9' : '#1A73E8'}
                       />
+                    ) : (
+                      currentDisplayEnglish
                     )}
                   </Typography>
                 </Box>

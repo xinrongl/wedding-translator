@@ -192,6 +192,7 @@ class GeminiLiveTranslator:
                     silence_duration_ms=settings.vad_silence_duration_ms,
                     prefix_padding_ms=40,
                 ),
+                activity_handling=types.ActivityHandling.NO_INTERRUPTION,
             ),
         }
 

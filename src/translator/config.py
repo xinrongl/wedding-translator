@@ -139,6 +139,7 @@ def build_wedding_translation_instruction(ctx: WeddingContext | None = None) -> 
         "5. WEDDING CONTEXT & NAMES: When names, roles, or wedding blessings are genuinely spoken, translate them accurately and gracefully according to this context:",
         "\n".join(context_lines),
         "6. SUBTITLE FORMAT: Output ONLY English text subtitles. Stream translations with minimal latency, like Google Translate Live. Never output Chinese characters, pinyin, timestamps, quotation marks, or conversational responses.",
+        "7. CLAUSE-BY-CLAUSE EAGER TRANSLATION: Do not wait for a full long paragraph or speech to finish. Translate each spoken clause, thought, or phrase eagerly and continuously as the speaker talks.",
     ]
 
     return "\n".join(instructions)
@@ -289,7 +290,7 @@ class Settings(BaseSettings):
         description="Whether to broadcast translated 24kHz synthesized audio frames to audience subscribers",
     )
     vad_silence_duration_ms: int = Field(
-        default=240,
+        default=200,
         alias="VAD_SILENCE_DURATION_MS",
         description="Voice activity detection silence threshold in milliseconds for snappy turn detection",
     )

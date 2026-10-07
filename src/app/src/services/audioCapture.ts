@@ -29,6 +29,9 @@ export class AudioCaptureService {
   private websocket: WebSocket | null = null;
   private isRecording = false;
   private isMuted = false;
+  private speechFrames = 0;
+  private silenceFrames = 0;
+  private isSpeaking = false;
   private targetSampleRate = 16000;
   private callbacks: AudioCaptureCallbacks;
 
@@ -158,6 +161,34 @@ export class AudioCaptureService {
           this.callbacks.onAudioLevel(levelPercent);
         }
 
+        // Hybrid VAD acoustic silence detection:
+        // Each ScriptProcessor frame is 1024 samples @ 16kHz ~= 64ms.
+        // levelPercent >= 7 indicates active speech energy.
+        if (levelPercent >= 7) {
+          this.speechFrames++;
+          this.silenceFrames = 0;
+          if (this.speechFrames >= 4) {
+            // >= 250ms of sustained speech
+            this.isSpeaking = true;
+          }
+        } else {
+          // Low energy frame (silence / pause)
+          if (this.isSpeaking) {
+            this.silenceFrames++;
+            // 5 frames of silence ~= 320ms pause after active speech
+            if (this.silenceFrames >= 5) {
+              this.isSpeaking = false;
+              this.speechFrames = 0;
+              this.silenceFrames = 0;
+              if (this.websocket && this.websocket.readyState === WebSocket.OPEN) {
+                this.websocket.send(JSON.stringify({ type: 'client_silence' }));
+              }
+            }
+          } else {
+            this.speechFrames = 0;
+          }
+        }
+
         // Downsample to 16,000 Hz if hardware sample rate is higher
         const pcm16Data = this.downsampleTo16kHz(inputChannelData, inputSampleRate, this.targetSampleRate);
 
@@ -185,6 +216,17 @@ export class AudioCaptureService {
    */
   public stop(): void {
     this.isRecording = false;
+    this.isSpeaking = false;
+    this.speechFrames = 0;
+    this.silenceFrames = 0;
+
+    if (this.websocket && this.websocket.readyState === WebSocket.OPEN) {
+      try {
+        this.websocket.send(JSON.stringify({ type: 'stream_end' }));
+      } catch {
+        // Ignore
+      }
+    }
 
     if (this.processor) {
       this.processor.disconnect();

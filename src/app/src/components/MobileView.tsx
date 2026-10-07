@@ -45,6 +45,7 @@ import type {
   TranslationSessionInfo,
   ViewMode,
 } from '../types';
+import { StreamingSubtitleText } from './StreamingSubtitleText';
 
 interface MobileViewProps {
   subtitles: SubtitleItem[];
@@ -708,27 +709,56 @@ export const MobileView: React.FC<MobileViewProps> = ({
                       </Typography>
                     </Stack>
 
-                    {activePartial.chinese && layoutMode !== 'english' && (
-                      <Typography sx={{ color: 'text.secondary', mb: 0.75, ...zhFontSx }}>
-                        {activePartial.chinese}
-                      </Typography>
-                    )}
-
-                    <Typography sx={{ color: 'text.primary', fontWeight: 550, ...enFontSx }}>
-                      {activePartial.english}
+                    {layoutMode === 'side-by-side' ? (
                       <Box
-                        component="span"
                         sx={{
-                          display: 'inline-block',
-                          width: 2,
-                          height: 18,
-                          ml: 0.5,
-                          verticalAlign: 'middle',
-                          bgcolor: isDark ? '#70A5F9' : '#1A73E8',
-                          animation: 'pulse 1s infinite',
+                          display: 'grid',
+                          gridTemplateColumns: { xs: '1fr', sm: '5fr 7fr' },
+                          gap: 2,
                         }}
-                      />
-                    </Typography>
+                      >
+                        <Box>
+                          <Typography sx={{ color: 'text.secondary', ...zhFontSx }}>
+                            <StreamingSubtitleText
+                              text={activePartial.chinese || ''}
+                              isChinese
+                              showCursor={false}
+                            />
+                          </Typography>
+                        </Box>
+                        <Box sx={{ borderLeft: { sm: '1px solid' }, borderColor: 'divider', pl: { sm: 2 } }}>
+                          <Typography sx={{ color: 'text.primary', fontWeight: 550, ...enFontSx }}>
+                            <StreamingSubtitleText
+                              text={activePartial.english}
+                              isChinese={false}
+                              showCursor
+                              cursorColor={isDark ? '#70A5F9' : '#1A73E8'}
+                            />
+                          </Typography>
+                        </Box>
+                      </Box>
+                    ) : (
+                      <>
+                        {activePartial.chinese && layoutMode !== 'english' && (
+                          <Typography sx={{ color: 'text.secondary', mb: 0.75, ...zhFontSx }}>
+                            <StreamingSubtitleText
+                              text={activePartial.chinese}
+                              isChinese
+                              showCursor={false}
+                            />
+                          </Typography>
+                        )}
+
+                        <Typography sx={{ color: 'text.primary', fontWeight: 550, ...enFontSx }}>
+                          <StreamingSubtitleText
+                            text={activePartial.english}
+                            isChinese={false}
+                            showCursor
+                            cursorColor={isDark ? '#70A5F9' : '#1A73E8'}
+                          />
+                        </Typography>
+                      </>
+                    )}
                   </CardContent>
                 </Card>
               )}
