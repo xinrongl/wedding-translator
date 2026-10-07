@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { resolveWsUrl } from '../services/audioCapture';
-import type { BackendConfig, LiveEvent, SubtitleItem, WeddingContextData } from '../types';
+import type { BackendConfig, LiveEvent, SubtitleItem, TranslationSessionInfo, WeddingContextData } from '../types';
 
 export type ConnectionStatus = 'connecting' | 'connected' | 'disconnected' | 'error';
 
@@ -10,6 +10,11 @@ export function useLiveSubtitles() {
   const [connectionStatus, setConnectionStatus] = useState<ConnectionStatus>('disconnected');
   const [audioLevel, setAudioLevel] = useState<number>(0);
   const [isSessionActive, setIsSessionActive] = useState<boolean>(false);
+  const [sessionInfo, setSessionInfo] = useState<TranslationSessionInfo>({
+    session_id: 'session_init',
+    session_number: 1,
+    session_title: 'Ceremony Speeches',
+  });
   const [wedding, setWedding] = useState<WeddingContextData>({
     bride_name: 'Joy',
     groom_name: 'Xinrong',
@@ -34,6 +39,13 @@ export function useLiveSubtitles() {
         setBackendConfig(data);
         if (data.wedding) {
           setWedding(data.wedding);
+        }
+        if (data.session_id) {
+          setSessionInfo({
+            session_id: data.session_id,
+            session_number: data.session_number ?? 1,
+            session_title: data.session_title ?? 'Ceremony Speeches',
+          });
         }
       }
     } catch (err) {
@@ -74,18 +86,46 @@ export function useLiveSubtitles() {
           case 'init':
             if (data.history) setSubtitles(data.history);
             if (data.wedding) setWedding(data.wedding);
+            if (data.session_id) {
+              setSessionInfo({
+                session_id: data.session_id,
+                session_number: data.session_number ?? 1,
+                session_title: data.session_title ?? 'Ceremony Speeches',
+              });
+            }
+            break;
+
+          case 'new_session':
+            setSubtitles([]);
+            setActivePartial(null);
+            if (data.session_id) {
+              setSessionInfo({
+                session_id: data.session_id,
+                session_number: data.session_number ?? 1,
+                session_title: data.session_title ?? 'Speech Session',
+                timestamp: data.timestamp,
+              });
+            }
             break;
 
           case 'partial':
           case 'interim':
             if (data.chinese !== undefined || data.english !== undefined) {
-              setActivePartial({
-                id: data.id ?? Date.now(),
-                chinese: data.chinese ?? '',
-                english: data.english ?? '',
-                timestamp: data.timestamp ?? new Date().toLocaleTimeString(),
+              setActivePartial((prev) => ({
+                id: data.id ?? prev?.id ?? Date.now(),
+                chinese:
+                  data.chinese !== undefined && data.chinese !== ''
+                    ? data.chinese
+                    : (prev?.chinese ?? ''),
+                english:
+                  data.english !== undefined && data.english !== ''
+                    ? data.english
+                    : (prev?.english ?? ''),
+                timestamp:
+                  data.timestamp ?? prev?.timestamp ?? new Date().toLocaleTimeString(),
                 isPartial: true,
-              });
+                is_interim: data.is_interim ?? false,
+              }));
             }
             break;
 
@@ -99,11 +139,20 @@ export function useLiveSubtitles() {
                 timestamp: data.timestamp ?? new Date().toLocaleTimeString(),
                 isPartial: false,
               };
-              setSubtitles((prev) => [...prev, newRecord]);
+              setSubtitles((prev) => {
+                const existingIndex = prev.findIndex((s) => s.id === newRecord.id);
+                if (existingIndex >= 0) {
+                  const updated = [...prev];
+                  updated[existingIndex] = newRecord;
+                  return updated;
+                }
+                return [...prev, newRecord];
+              });
             }
             break;
 
           case 'interrupted':
+            // Model detected user interruption / barge-in. Clear live partial; backend finalizes if applicable.
             setActivePartial(null);
             break;
 
@@ -159,6 +208,34 @@ export function useLiveSubtitles() {
     };
   }, [connect, fetchConfig]);
 
+  const createNewSession = useCallback(
+    async (title?: string) => {
+      try {
+        const res = await fetch(`${apiBase}/api/session/new`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ title: title || undefined }),
+        });
+        if (res.ok) {
+          const data = await res.json();
+          setSubtitles([]);
+          setActivePartial(null);
+          setSessionInfo({
+            session_id: data.session_id,
+            session_number: data.session_number,
+            session_title: data.session_title,
+            timestamp: data.timestamp,
+          });
+          return true;
+        }
+      } catch (err) {
+        console.error('Failed to create new session:', err);
+      }
+      return false;
+    },
+    [apiBase]
+  );
+
   const clearTranscript = useCallback(async () => {
     try {
       const res = await fetch(`${apiBase}/api/transcript/clear`, { method: 'POST' });
@@ -184,8 +261,10 @@ export function useLiveSubtitles() {
     connectionStatus,
     audioLevel,
     isSessionActive,
+    sessionInfo,
     wedding,
     backendConfig,
+    createNewSession,
     clearTranscript,
     exportTranscript,
     reconnect: connect,

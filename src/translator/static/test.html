@@ -24,18 +24,18 @@
         <span class="text-3xl">💍</span>
         <div>
           <h1 class="text-xl font-bold bg-gradient-to-r from-amber-200 via-amber-400 to-amber-200 bg-clip-text text-transparent">
-            Wedding Speech Translator
+            Wedding Translator
           </h1>
-          <p class="text-xs text-slate-400">Pure Gemini Live Bidirectional Translation</p>
+          <p class="text-xs text-slate-400">Gemini 3.8 Live 1-Step Real-time Speech Translation</p>
         </div>
       </div>
       <div class="flex items-center space-x-3 text-xs">
         <div id="badge-gcp" class="px-2.5 py-1 rounded-full bg-slate-800 border border-slate-700 text-slate-300 flex items-center space-x-1.5">
           <span class="w-2 h-2 rounded-full bg-yellow-400" id="gcp-dot"></span>
-          <span id="gcp-status">Connecting to Gemini Live...</span>
+          <span id="gcp-status">Connecting to Gemini 3.8 Live...</span>
         </div>
         <div id="badge-engine" class="px-2.5 py-1 rounded-full bg-amber-950/60 border border-amber-800/60 text-amber-300 font-mono">
-          <span id="engine-label">gemini-3.5-live-translate-preview</span>
+          <span id="engine-label">gemini-3.8-live</span>
         </div>
       </div>
     </div>
@@ -95,8 +95,8 @@
           <div>
             <label class="text-xs text-slate-400 block mb-1">Model Architecture</label>
             <div class="text-amber-300/90 text-xs font-mono bg-slate-900 p-2 rounded border border-slate-800">
-              gemini-3.5-live-translate-preview<br>
-              <span class="text-slate-500">Vertex AI (global) • Code-Switching Active</span>
+              gemini-3.8-live<br>
+              <span class="text-slate-500">1-Step Streaming Subtitles • Code-Switching Active</span>
             </div>
           </div>
         </div>
@@ -167,6 +167,10 @@
   </main>
 
   <script>
+    if (window.location.hostname === '0.0.0.0') {
+      window.location.hostname = 'localhost';
+    }
+
     let isRecording = false;
     let speakerWs = null;
     let subtitleWs = null;
@@ -181,8 +185,10 @@
         const data = await res.json();
         if (data.status === 'ok') {
           document.getElementById('gcp-dot').className = 'w-2 h-2 rounded-full bg-emerald-400';
-          document.getElementById('gcp-status').textContent = `GCP Active: ${data.project_id}`;
-          document.getElementById('engine-label').textContent = `${data.transcribe_model} + ${data.translation_model}`;
+          const proj = data.project_id || 'AI Studio';
+          const backend = data.use_vertex ? 'Vertex AI' : 'AI Studio';
+          document.getElementById('gcp-status').textContent = `${backend}: ${proj}`;
+          document.getElementById('engine-label').textContent = data.live_model || 'gemini-3.8-live';
         }
       } catch (err) {
         document.getElementById('gcp-dot').className = 'w-2 h-2 rounded-full bg-rose-500';
@@ -208,7 +214,7 @@
             document.getElementById('empty-state')?.remove();
             msg.history.forEach(item => appendSubtitle(item));
           }
-        } else if (msg.type === 'interim') {
+        } else if (msg.type === 'partial' || msg.type === 'interim') {
           if (msg.chinese) {
             document.getElementById('interim-chinese').textContent = msg.chinese;
           }
@@ -303,6 +309,18 @@
         speakerWs.onopen = async () => {
           document.getElementById('ws-speaker-status').textContent = 'Connecting Live Session...';
           document.getElementById('ws-speaker-status').className = 'text-amber-400';
+
+          if (!navigator.mediaDevices || typeof navigator.mediaDevices.getUserMedia !== 'function') {
+            const isSecure = typeof window !== 'undefined' && window.isSecureContext;
+            const errorMsg = !isSecure
+              ? `Microphone access is blocked because this page is not in a Secure Context. Please open http://localhost:${window.location.port || 8000}/test or use HTTPS.`
+              : 'Microphone API (navigator.mediaDevices.getUserMedia) is not supported or was blocked by browser permissions.';
+            alert(errorMsg);
+            document.getElementById('ws-speaker-status').textContent = 'Mic Error: Not Secure Context';
+            document.getElementById('ws-speaker-status').className = 'text-rose-400';
+            stopMicrophone();
+            return;
+          }
 
           mediaStream = await navigator.mediaDevices.getUserMedia({
             audio: {

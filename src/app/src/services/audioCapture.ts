@@ -29,6 +29,9 @@ export class AudioCaptureService {
   private websocket: WebSocket | null = null;
   private isRecording = false;
   private isMuted = false;
+  private speechFrames = 0;
+  private silenceFrames = 0;
+  private isSpeaking = false;
   private targetSampleRate = 16000;
   private callbacks: AudioCaptureCallbacks;
 
@@ -61,8 +64,19 @@ export class AudioCaptureService {
 
     try {
       // 1. Request microphone access with acoustic settings optimized for speech recognition
-      // Note: Setting aggressive noiseSuppression=true often clips initial Chinese consonants (zh/ch/sh/j/q/x).
-      // We set ideal constraints so browsers preserve consonant frequency fidelity and phonetic dynamics.
+      // Note: Browsers only expose navigator.mediaDevices in a Secure Context (HTTPS or localhost).
+      if (!navigator.mediaDevices || typeof navigator.mediaDevices.getUserMedia !== 'function') {
+        const isSecure = typeof window !== 'undefined' && window.isSecureContext;
+        if (!isSecure) {
+          throw new Error(
+            `Microphone access is blocked because this page is not in a Secure Context. Please open http://localhost:${window.location.port || '8000'}/speaker or use HTTPS.`
+          );
+        }
+        throw new Error(
+          'Microphone capture is not supported by this browser or permissions are denied.'
+        );
+      }
+
       this.mediaStream = await navigator.mediaDevices.getUserMedia({
         audio: {
           channelCount: 1,
@@ -115,8 +129,8 @@ export class AudioCaptureService {
       // 3. Setup Web Audio API pipeline with native 16kHz hardware resampling
       const AudioCtx = window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
       try {
-        // Modern Chrome/Safari/Edge natively resample mic input to 16kHz via OS-level bandlimited sinc filter
-        this.audioContext = new AudioCtx({ sampleRate: 16000 });
+        // Modern Chrome/Safari/Edge natively resample mic input to 16kHz with interactive low latency
+        this.audioContext = new AudioCtx({ sampleRate: 16000, latencyHint: 'interactive' });
       } catch {
         this.audioContext = new AudioCtx();
       }
@@ -124,8 +138,8 @@ export class AudioCaptureService {
 
       this.sourceNode = this.audioContext.createMediaStreamSource(this.mediaStream);
 
-      // ScriptProcessorNode bufferSize = 2048 (~42ms at 48kHz, ~128ms at 16kHz) for lower capture latency
-      this.processor = this.audioContext.createScriptProcessor(2048, 1, 1);
+      // ScriptProcessorNode bufferSize = 1024 (~64ms at 16kHz) for ultra-low streaming latency
+      this.processor = this.audioContext.createScriptProcessor(1024, 1, 1);
 
       this.processor.onaudioprocess = (e: AudioProcessingEvent) => {
         if (!this.isRecording || this.isMuted) {
@@ -145,6 +159,34 @@ export class AudioCaptureService {
         const levelPercent = Math.min(100, Math.round(rms * 250));
         if (this.callbacks.onAudioLevel) {
           this.callbacks.onAudioLevel(levelPercent);
+        }
+
+        // Hybrid VAD acoustic silence detection:
+        // Each ScriptProcessor frame is 1024 samples @ 16kHz ~= 64ms.
+        // levelPercent >= 7 indicates active speech energy.
+        if (levelPercent >= 7) {
+          this.speechFrames++;
+          this.silenceFrames = 0;
+          if (this.speechFrames >= 4) {
+            // >= 250ms of sustained speech
+            this.isSpeaking = true;
+          }
+        } else {
+          // Low energy frame (silence / pause)
+          if (this.isSpeaking) {
+            this.silenceFrames++;
+            // 5 frames of silence ~= 320ms pause after active speech
+            if (this.silenceFrames >= 5) {
+              this.isSpeaking = false;
+              this.speechFrames = 0;
+              this.silenceFrames = 0;
+              if (this.websocket && this.websocket.readyState === WebSocket.OPEN) {
+                this.websocket.send(JSON.stringify({ type: 'client_silence' }));
+              }
+            }
+          } else {
+            this.speechFrames = 0;
+          }
         }
 
         // Downsample to 16,000 Hz if hardware sample rate is higher
@@ -174,6 +216,17 @@ export class AudioCaptureService {
    */
   public stop(): void {
     this.isRecording = false;
+    this.isSpeaking = false;
+    this.speechFrames = 0;
+    this.silenceFrames = 0;
+
+    if (this.websocket && this.websocket.readyState === WebSocket.OPEN) {
+      try {
+        this.websocket.send(JSON.stringify({ type: 'stream_end' }));
+      } catch {
+        // Ignore
+      }
+    }
 
     if (this.processor) {
       this.processor.disconnect();
@@ -211,6 +264,19 @@ export class AudioCaptureService {
 
     if (this.callbacks.onAudioLevel) this.callbacks.onAudioLevel(0);
     if (this.callbacks.onStateChange) this.callbacks.onStateChange(false);
+  }
+
+  /**
+   * Signal stream end / turn boundary to trigger Gemini Live (audio_stream_end=True).
+   */
+  public sendStreamEnd(): void {
+    if (this.websocket && this.websocket.readyState === WebSocket.OPEN) {
+      try {
+        this.websocket.send(JSON.stringify({ type: 'stream_end' }));
+      } catch (err) {
+        console.debug('Failed to send stream_end over WebSocket:', err);
+      }
+    }
   }
 
   /**

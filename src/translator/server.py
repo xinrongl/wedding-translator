@@ -1,4 +1,4 @@
-"""FastAPI application and WebSocket hub adapted from official google-gemini/gemini-live-api-examples."""
+"""FastAPI application and WebSocket hub for the Wedding Translator service."""
 
 import asyncio
 import json
@@ -18,9 +18,8 @@ from google.oauth2 import id_token as google_id_token
 from pydantic import BaseModel
 
 from translator.config import ROOT, settings
-from translator.live_translate import GeminiLiveTranslator
+from translator.live_translate import GeminiLiveTranslator, LiveEvent
 
-logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("wedding_translator.server")
 
 # Reused across requests: fetches and caches Google's public signing keys.
@@ -28,31 +27,157 @@ _google_auth_transport = google_auth_requests.Request()
 
 
 def verify_speaker_identity(token: str) -> str | None:
-    """Verify a Google 'Sign in with Google' ID token and return the verified email if the
-    account is in the approved allowlist, else None."""
+    """Verify a 'Sign in with Google' ID token against the approved speaker allowlist.
+
+    Args:
+        token: Google OAuth ID token string.
+
+    Returns:
+        Verified email address if authorized, otherwise None.
+    """
     if not token:
         return None
     try:
         claims = google_id_token.verify_oauth2_token(
             token, _google_auth_transport, settings.google_oauth_client_id
         )
-    except Exception as e:
-        logger.warning(f"Speaker ID token verification failed: {e}")
+    except Exception as exc:
+        logger.warning("Speaker ID token verification failed: %s", exc)
         return None
 
     email = (claims.get("email") or "").lower()
-    if not claims.get("email_verified") or email not in settings.speaker_allowed_emails_set:
-        logger.warning(f"Speaker WebSocket rejected: {email or 'unknown account'} is not approved")
+    if (
+        not claims.get("email_verified")
+        or email not in settings.speaker_allowed_emails_set
+    ):
+        logger.warning(
+            "Speaker WebSocket rejected: '%s' is not in approved allowlist",
+            email or "unknown",
+        )
         return None
     return email
 
+
+class SubtitleRecord(BaseModel):
+    """A single finalized subtitle segment."""
+
+    id: int
+    chinese: str
+    english: str
+    timestamp: str
+
+
+class BroadcastHub:
+    """Thread-safe WebSocket manager distributing subtitle events to audience displays."""
+
+    def __init__(self) -> None:
+        self._connections: set[WebSocket] = set()
+        self._lock = asyncio.Lock()
+
+    async def connect(self, websocket: WebSocket) -> None:
+        await websocket.accept()
+        async with self._lock:
+            self._connections.add(websocket)
+        logger.info(
+            "Subtitle subscriber connected. Total active: %d", len(self._connections)
+        )
+
+    async def disconnect(self, websocket: WebSocket) -> None:
+        async with self._lock:
+            self._connections.discard(websocket)
+        logger.info(
+            "Subtitle subscriber disconnected. Remaining: %d", len(self._connections)
+        )
+
+    @property
+    def connection_count(self) -> int:
+        return len(self._connections)
+
+    async def broadcast(self, data: dict[str, Any]) -> None:
+        """Broadcast JSON message concurrently to all subscribers, pruning dead sockets."""
+        if not self._connections:
+            return
+
+        message = json.dumps(data, ensure_ascii=False)
+        async with self._lock:
+            targets = list(self._connections)
+
+        dead_connections: list[WebSocket] = []
+
+        async def _send(ws: WebSocket) -> None:
+            try:
+                await ws.send_text(message)
+            except Exception:
+                dead_connections.append(ws)
+
+        await asyncio.gather(*[_send(ws) for ws in targets], return_exceptions=True)
+
+        if dead_connections:
+            async with self._lock:
+                for dead in dead_connections:
+                    self._connections.discard(dead)
+
+
+class SessionManager:
+    """Coordinates single-active-speaker concurrency and live transcript history."""
+
+    def __init__(self) -> None:
+        self._lock = asyncio.Lock()
+        self.is_active = False
+        self.history: list[SubtitleRecord] = []
+        self.session_number: int = 1
+        self.session_id: str = f"session_{int(time.time())}"
+        self.session_title: str = "Ceremony Speeches"
+        self.session_start_time: float = time.time()
+
+    async def acquire_speaker_session(self) -> bool:
+        """Attempt to acquire the exclusive speaker lock."""
+        async with self._lock:
+            if self.is_active:
+                return False
+            self.is_active = True
+            return True
+
+    async def release_speaker_session(self) -> None:
+        """Release the exclusive speaker lock."""
+        async with self._lock:
+            self.is_active = False
+
+    def add_record(self, record: SubtitleRecord) -> None:
+        self.history.append(record)
+
+    def clear_history(self) -> None:
+        self.history.clear()
+
+    def start_new_session(self, title: str | None = None) -> dict[str, Any]:
+        """Reset transcript history and advance to a new translation session."""
+        self.history.clear()
+        self.session_number += 1
+        self.session_id = f"session_{int(time.time())}"
+        self.session_title = (
+            title.strip()
+            if title and title.strip()
+            else f"Speech Session #{self.session_number}"
+        )
+        self.session_start_time = time.time()
+        return {
+            "session_id": self.session_id,
+            "session_number": self.session_number,
+            "session_title": self.session_title,
+            "session_start_time": self.session_start_time,
+        }
+
+
+# Application singletons
+hub = BroadcastHub()
+session_manager = SessionManager()
+
 app = FastAPI(
-    title="Wedding Speech Translator (Gemini Live)",
-    description="Real-time Chinese to English speech translation powered by Gemini Live API.",
-    version="0.2.0",
+    title="Wedding Speech Translator (Gemini 3.8 Live)",
+    description="Real-time Chinese-to-English speech translation powered by Gemini 3.8 Live.",
+    version=settings.version,
 )
 
-# Enable CORS for local and web clients
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -62,64 +187,8 @@ app.add_middleware(
 )
 
 
-class SubtitleRecord(BaseModel):
-    """A single finalized subtitle entry."""
-
-    id: int
-    chinese: str
-    english: str
-    timestamp: str
-
-
-class BroadcastHub:
-    """Manages connected subtitle subscribers (projector, admin, mobile)."""
-
-    def __init__(self):
-        self._active_connections: set[WebSocket] = set()
-
-    async def connect(self, websocket: WebSocket) -> None:
-        await websocket.accept()
-        self._active_connections.add(websocket)
-        logger.info(
-            f"Subtitle subscriber connected. Total subscribers: {len(self._active_connections)}"
-        )
-
-    def disconnect(self, websocket: WebSocket) -> None:
-        self._active_connections.discard(websocket)
-        logger.info(
-            f"Subtitle subscriber disconnected. Remaining: {len(self._active_connections)}"
-        )
-
-    async def broadcast(self, data: dict[str, Any]) -> None:
-        if not self._active_connections:
-            return
-
-        message = json.dumps(data, ensure_ascii=False)
-        connections = list(self._active_connections)
-
-        async def _send(conn: WebSocket):
-            try:
-                await conn.send_text(message)
-                return None
-            except Exception:
-                return conn
-
-        results = await asyncio.gather(
-            *[_send(c) for c in connections], return_exceptions=True
-        )
-        for res in results:
-            if isinstance(res, WebSocket):
-                self._active_connections.discard(res)
-
-
-# Global state singletons
-hub = BroadcastHub()
-transcript_history: list[SubtitleRecord] = []
-is_session_active = False
-
-
 def calculate_pcm_level(pcm_data: bytes) -> float:
-    """Calculate RMS energy level (0-100%) from 16-bit linear PCM audio."""
+    """Calculate RMS energy level (0.0 to 100.0) from 16-bit linear PCM audio."""
     if len(pcm_data) < 2:
         return 0.0
     count = len(pcm_data) // 2
@@ -129,28 +198,25 @@ def calculate_pcm_level(pcm_data: bytes) -> float:
     return min(100.0, round((rms / 32768.0) * 100.0, 1))
 
 
-async def handle_live_event(
-    event: dict[str, Any], speaker_ws: WebSocket | None = None
-) -> None:
-    """Handle events emitted by the Gemini Live Translation API and broadcast to all screens."""
+async def handle_live_event(event: LiveEvent) -> None:
+    """Process an event emitted by Gemini 3.8 Live and broadcast to audience screens."""
     event_type = event.get("type")
 
     if event_type == "final":
         record = SubtitleRecord(
-            id=event["id"],
-            chinese=event["chinese"],
-            english=event["english"],
-            timestamp=event["timestamp"],
+            id=event.get("id", len(session_manager.history) + 1),
+            chinese=event.get("chinese", ""),
+            english=event.get("english", ""),
+            timestamp=event.get("timestamp", time.strftime("%H:%M:%S")),
         )
-        transcript_history.append(record)
+        session_manager.add_record(record)
     elif event_type == "session_status" and event.get("status") == "connected":
-        # Normalize status to 'live' for frontend indicator compatibility
         event = {**event, "status": "live"}
 
-    # Broadcast event to all connected subtitle displays
     await hub.broadcast(event)
 
 
+# Frontend static files routing
 STATIC_DIR = Path(__file__).parent / "static"
 TEST_HTML_PATH = STATIC_DIR / "test.html"
 
@@ -189,7 +255,7 @@ async def get_frontend_page():
         return FileResponse(index_html)
     if TEST_HTML_PATH.exists():
         return HTMLResponse(content=TEST_HTML_PATH.read_text(encoding="utf-8"))
-    return HTMLResponse("<h1>Wedding Translator (Gemini Live) is running</h1>")
+    return HTMLResponse("<h1>Wedding Translator (Gemini 3.8 Live) is running</h1>")
 
 
 @app.get("/test", response_class=HTMLResponse)
@@ -197,39 +263,44 @@ async def get_test_page():
     """Serve the interactive microphone testing console."""
     if TEST_HTML_PATH.exists():
         return HTMLResponse(content=TEST_HTML_PATH.read_text(encoding="utf-8"))
-    return HTMLResponse("<h1>Wedding Translator (Gemini Live) is running</h1>")
+    return HTMLResponse("<h1>Wedding Translator (Gemini 3.8 Live) is running</h1>")
 
 
 @app.get("/api/health")
 async def health_check():
-    """Verify backend and Gemini Live configuration."""
+    """Return backend status and active model configuration."""
     return {
         "status": "ok",
+        "live_model": settings.live_model,
+        "use_vertex": settings.use_vertex,
         "project_id": settings.google_cloud_project,
         "location": settings.google_cloud_location,
-        "transcribe_model": settings.transcribe_model,
-        "translation_model": settings.translation_model,
         "source_language": settings.source_language_description,
         "target_language": settings.target_language,
-        "subscribers_count": len(hub._active_connections),
-        "is_session_active": is_session_active,
+        "subscribers_count": hub.connection_count,
+        "is_session_active": session_manager.is_active,
     }
+
+
+class NewSessionPayload(BaseModel):
+    title: str | None = None
 
 
 @app.get("/api/config")
 async def get_config():
-    """Get active configuration."""
+    """Return public application configuration."""
     return {
         "project_id": settings.google_cloud_project,
         "location": settings.google_cloud_location,
-        "transcribe_model": settings.transcribe_model,
-        "translation_model": settings.translation_model,
+        "live_model": settings.live_model,
+        "use_vertex": settings.use_vertex,
         "source_language": settings.source_language_description,
         "target_language": settings.target_language,
         "wedding": settings.wedding.model_dump(),
-        "enable_live_audio_stream": settings.enable_live_audio_stream,
-        # Public by design: Google Identity Services requires the client ID in frontend JS.
         "google_oauth_client_id": settings.google_oauth_client_id,
+        "session_id": session_manager.session_id,
+        "session_number": session_manager.session_number,
+        "session_title": session_manager.session_title,
     }
 
 
@@ -238,27 +309,26 @@ async def export_transcript(format: str = "markdown"):
     """Export complete speech transcript as Markdown or CSV."""
     if format == "csv":
         lines = ["id,timestamp,chinese,english"]
-        for r in transcript_history:
+        for r in session_manager.history:
             lines.append(f'{r.id},"{r.timestamp}","{r.chinese}","{r.english}"')
-        content = "\n".join(lines)
         return PlainTextResponse(
-            content,
+            "\n".join(lines),
             media_type="text/csv",
             headers={
                 "Content-Disposition": "attachment; filename=wedding_transcript.csv"
             },
         )
 
-    # Markdown format
     lines = [
         f"# Wedding Speech Transcript: {settings.wedding.bride_name} & {settings.wedding.groom_name}",
         f"**Date**: {time.strftime('%Y-%m-%d %H:%M:%S')}",
-        f"**Engine**: Two-Step Transcribe & Translate ({settings.transcribe_model} + {settings.translation_model})",
+        f"**Session**: #{session_manager.session_number} ({session_manager.session_title})",
+        f"**Engine**: Gemini 3.8 Live 1-Step Real-Time Speech Translation ({settings.live_model})",
         "",
         "---",
         "",
     ]
-    for r in transcript_history:
+    for r in session_manager.history:
         lines.append(f"**[{r.timestamp}] #{r.id}**")
         lines.append(f"> 🇨🇳 {r.chinese}")
         lines.append(f"> 🇬🇧 {r.english}")
@@ -274,161 +344,212 @@ async def export_transcript(format: str = "markdown"):
 @app.post("/api/transcript/clear")
 async def clear_transcript():
     """Clear transcript history for a new speaker."""
-    transcript_history.clear()
+    session_manager.clear_history()
     await hub.broadcast({"type": "transcript_cleared"})
     return {"status": "cleared"}
 
 
+@app.post("/api/session/new")
+async def create_new_session(payload: NewSessionPayload | None = None):
+    """Start a new translation session, clearing transcript and broadcasting new session info."""
+    title = payload.title if payload else None
+    session_info = session_manager.start_new_session(title=title)
+    await hub.broadcast(
+        {
+            "type": "new_session",
+            **session_info,
+            "timestamp": time.strftime("%H:%M:%S"),
+        }
+    )
+    return {"status": "ok", **session_info}
+
+
 @app.websocket("/ws/subtitles")
 async def websocket_subtitles(websocket: WebSocket):
-    """WebSocket endpoint for audience screens, projector, and mobile clients to receive subtitles."""
+    """Audience WebSocket feed for projector, console, and mobile guests."""
     await hub.connect(websocket)
     try:
-        # Send initial state and existing transcript history upon connection
+        # Send initial snapshot upon connection
         await websocket.send_text(
             json.dumps(
                 {
                     "type": "init",
-                    "history": [r.model_dump() for r in transcript_history],
-                    "transcribe_model": settings.transcribe_model,
-                    "translation_model": settings.translation_model,
+                    "history": [r.model_dump() for r in session_manager.history],
+                    "live_model": settings.live_model,
+                    "use_vertex": settings.use_vertex,
                     "source_language": settings.source_language_description,
                     "target_language": settings.target_language,
                     "wedding": settings.wedding.model_dump(),
+                    "session_id": session_manager.session_id,
+                    "session_number": session_manager.session_number,
+                    "session_title": session_manager.session_title,
                 },
                 ensure_ascii=False,
             )
         )
 
-        # Keep connection open and respond to client pings
         while True:
-            data = await websocket.receive_text()
-            if data == "ping":
+            msg = await websocket.receive_text()
+            if msg == "ping":
                 await websocket.send_text("pong")
     except WebSocketDisconnect:
-        hub.disconnect(websocket)
-    except Exception as e:
-        logger.warning(f"Subtitle subscriber error: {e}")
-        hub.disconnect(websocket)
+        await hub.disconnect(websocket)
+    except Exception as exc:
+        logger.warning("Subtitle subscriber error: %s", exc)
+        await hub.disconnect(websocket)
 
 
 @app.websocket("/ws")
 @app.websocket("/ws/speaker")
 async def websocket_speaker(websocket: WebSocket):
-    """WebSocket endpoint for Gemini Live streaming, following official Python SDK pattern."""
+    """Speaker audio streaming WebSocket endpoint."""
     await websocket.accept()
 
-    verified_email: str | None = None
-    if settings.google_oauth_client_id:
-        provided_token = websocket.query_params.get("id_token", "")
-        verified_email = verify_speaker_identity(provided_token)
-        if not verified_email:
-            await websocket.close(
-                code=4401,
-                reason="Sign in with an approved Google account to start streaming",
-            )
-            return
-    else:
-        logger.warning(
-            "GOOGLE_OAUTH_CLIENT_ID is not set — /ws/speaker accepts any client. "
-            "Set GOOGLE_OAUTH_CLIENT_ID and SPEAKER_ALLOWED_EMAILS before deploying."
+    # Google Identity authentication (fail closed: no client ID means no speaker access)
+    if not settings.google_oauth_client_id:
+        logger.error(
+            "Speaker WebSocket rejected: GOOGLE_OAUTH_CLIENT_ID is not set, sign-in gate cannot verify speakers"
         )
+        await websocket.close(
+            code=4401,
+            reason="Speaker sign-in is not configured on the server",
+        )
+        return
+    provided_token = websocket.query_params.get("id_token", "")
+    verified_email = verify_speaker_identity(provided_token)
+    if not verified_email:
+        await websocket.close(
+            code=4401,
+            reason="Sign in with an approved Google account to start streaming",
+        )
+        return
 
-    if is_session_active:
-        logger.warning("Speaker WebSocket rejected: a session is already active")
+    acquired = await session_manager.acquire_speaker_session()
+    if not acquired:
+        logger.warning("Speaker connection rejected: another speaker session is active")
         await websocket.close(code=4409, reason="A speaker session is already active")
         return
 
-    logger.info(
-        f"Speaker audio WebSocket accepted{f' for {verified_email}' if verified_email else ''}"
-    )
+    logger.info("Speaker audio WebSocket accepted for %s", verified_email)
 
-    audio_input_queue: asyncio.Queue[bytes] = asyncio.Queue()
-    text_input_queue: asyncio.Queue[str] = asyncio.Queue()
+    audio_queue: asyncio.Queue[bytes] = asyncio.Queue()
+    text_queue: asyncio.Queue[str] = asyncio.Queue()
+    control_queue: asyncio.Queue[str] = asyncio.Queue()
+    translator = GeminiLiveTranslator()
 
-    async def audio_output_callback(data: bytes):
-        if settings.enable_live_audio_stream:
-            try:
-                await websocket.send_bytes(data)
-            except Exception as e:
-                logger.debug(f"Failed to send audio bytes to client: {e}")
-
-    async def audio_interrupt_callback():
+    async def audio_interrupt_callback() -> None:
         await hub.broadcast({"type": "interrupted"})
 
-    translator = GeminiLiveTranslator()
     last_rms_time = 0.0
 
-    async def receive_from_client():
+    async def receive_from_client() -> None:
         nonlocal last_rms_time
         try:
             while True:
                 message = await websocket.receive()
                 msg_type = message.get("type")
                 if msg_type == "websocket.disconnect":
-                    logger.info("Speaker WebSocket client disconnected")
                     break
 
-                if message.get("bytes"):
-                    pcm_data = message["bytes"]
+                if pcm_data := message.get("bytes"):
+                    await audio_queue.put(pcm_data)
 
-                    # Fast path: immediately queue audio for Gemini Live without waiting
-                    await audio_input_queue.put(pcm_data)
-
-                    # Compute VU level for live UI meter (background broadcast without delaying audio stream)
                     now = time.time()
                     if now - last_rms_time >= 0.15:
                         last_rms_time = now
                         level = calculate_pcm_level(pcm_data)
-                        asyncio.create_task(
-                            hub.broadcast({"type": "audio_level", "level": level})
-                        )
+                        await hub.broadcast({"type": "audio_level", "level": level})
 
-                elif message.get("text"):
-                    text = message["text"]
-                    logger.debug(f"Received text message from client: {text}")
-                    await text_input_queue.put(text)
-
+                elif text := message.get("text"):
+                    try:
+                        parsed = json.loads(text)
+                        if isinstance(parsed, dict):
+                            msg_t = parsed.get("type")
+                            if msg_t in ("stream_end", "client_silence", "turn_end"):
+                                logger.info(
+                                    "Received Hybrid VAD control signal: %s", msg_t
+                                )
+                                await control_queue.put("stream_end")
+                                continue
+                            elif msg_t == "client_interim":
+                                interim_zh = str(parsed.get("text", "")).strip()
+                                if interim_zh:
+                                    translator.current_chinese = interim_zh
+                                    await hub.broadcast(
+                                        {
+                                            "type": "partial",
+                                            "chinese": interim_zh,
+                                            "english": getattr(
+                                                translator, "current_english", ""
+                                            ),
+                                            "is_interim": True,
+                                        }
+                                    )
+                                continue
+                            elif msg_t == "client_final":
+                                final_zh = str(parsed.get("text", "")).strip()
+                                if final_zh:
+                                    translator.current_chinese = final_zh
+                                    await hub.broadcast(
+                                        {
+                                            "type": "partial",
+                                            "chinese": final_zh,
+                                            "english": getattr(
+                                                translator, "current_english", ""
+                                            ),
+                                            "is_interim": False,
+                                        }
+                                    )
+                                continue
+                    except Exception as exc:
+                        logger.debug("Failed parsing client JSON message: %s", exc)
+                    await text_queue.put(text)
         except (WebSocketDisconnect, asyncio.CancelledError):
-            logger.info("Speaker WebSocket receive task stopped")
-        except Exception as e:
-            logger.error(f"Error receiving from speaker client: {e}")
+            pass
+        except Exception as exc:
+            logger.error("Error receiving from speaker client: %s", exc)
 
-    async def run_session():
-        global is_session_active
-        is_session_active = True
+    async def run_translator() -> None:
         try:
             async for event in translator.start_session(
-                audio_input_queue=audio_input_queue,
-                text_input_queue=text_input_queue,
-                audio_output_callback=audio_output_callback,
+                audio_input_queue=audio_queue,
+                text_input_queue=text_queue,
+                control_queue=control_queue,
                 audio_interrupt_callback=audio_interrupt_callback,
             ):
                 if event:
                     await handle_live_event(event)
         except (asyncio.CancelledError, GeneratorExit):
             pass
-        except Exception as e:
-            logger.error(f"Error in Gemini Live session: {type(e).__name__}: {e}")
-        finally:
-            is_session_active = False
+        except Exception:
+            logger.exception("Error in live translation session")
 
     receive_task = asyncio.create_task(receive_from_client())
-    session_task = asyncio.create_task(run_session())
+    translator_task = asyncio.create_task(run_translator())
 
     try:
-        # Wait until either the client disconnects or the Gemini session finishes
-        await asyncio.wait(
-            [receive_task, session_task],
+        done, _ = await asyncio.wait(
+            [receive_task, translator_task],
             return_when=asyncio.FIRST_COMPLETED,
         )
+        for completed_task in done:
+            name = (
+                "client_audio_input"
+                if completed_task is receive_task
+                else "gemini_live_session"
+            )
+            if exc := completed_task.exception():
+                logger.error("Speaker task '%s' ended with error: %s", name, exc)
+            else:
+                logger.info("Speaker task '%s' completed", name)
     finally:
         receive_task.cancel()
-        session_task.cancel()
-        await asyncio.gather(receive_task, session_task, return_exceptions=True)
+        translator_task.cancel()
+        await asyncio.gather(receive_task, translator_task, return_exceptions=True)
+        await session_manager.release_speaker_session()
         await hub.broadcast({"type": "session_status", "status": "idle"})
         await hub.broadcast({"type": "audio_level", "level": 0.0})
         try:
             await websocket.close()
-        except Exception as e:
-            logger.debug(f"Error closing speaker WebSocket: {e}")
+        except Exception as exc:
+            logger.debug("Closing speaker WebSocket finished with: %s", exc)

@@ -79,7 +79,9 @@ Adapted directly from the official [`google-gemini/gemini-live-api-examples`](ht
   `async def start_session(...)` yields structured events (`session_status`, `interim`, `final`, `audio_level`, `interrupted`) while guaranteeing clean task cancellation (`send_audio_task`, `send_text_task`, `receive_task`) in `finally:` blocks.
 - **Translation Specific Configuration**:
   ```python
-  client = genai.Client(vertexai=True, project=settings.google_cloud_project, location="global")
+  client = genai.Client(
+      vertexai=True, project=settings.google_cloud_project, location="global"
+  )
   config = types.LiveConnectConfig(
       response_modalities=[types.Modality.AUDIO],
       speech_config=types.SpeechConfig(

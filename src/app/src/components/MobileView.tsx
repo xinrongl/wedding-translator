@@ -1,31 +1,63 @@
 import React, { useEffect, useRef, useState } from 'react';
 import {
-  ArrowDown,
-  Languages,
-  Share2,
-  Sparkles,
-  Type,
-  Check,
-  QrCode,
-  Sun,
-  Moon,
-  Columns2,
-  Rows2,
-} from 'lucide-react';
+  Box,
+  Container,
+  Typography,
+  Stack,
+  Card,
+  CardContent,
+  Button,
+  IconButton,
+  Chip,
+  ToggleButtonGroup,
+  ToggleButton,
+  Fab,
+  Tooltip,
+  Paper,
+  BottomNavigation,
+  BottomNavigationAction,
+  alpha,
+} from '@mui/material';
+
+import MicIcon from '@mui/icons-material/Mic';
+import DesktopWindowsIcon from '@mui/icons-material/DesktopWindows';
+import PhoneIphoneIcon from '@mui/icons-material/PhoneIphone';
+import VolumeUpIcon from '@mui/icons-material/VolumeUp';
+import ContentCopyIcon from '@mui/icons-material/ContentCopy';
+import ShareIcon from '@mui/icons-material/Share';
+import QrCode2Icon from '@mui/icons-material/QrCode2';
+import LightModeIcon from '@mui/icons-material/LightMode';
+import DarkModeIcon from '@mui/icons-material/DarkMode';
+import KeyboardArrowDownIcon from '@mui/icons-material/KeyboardArrowDown';
+import CheckIcon from '@mui/icons-material/Check';
+import TableRowsIcon from '@mui/icons-material/TableRows';
+import ViewWeekIcon from '@mui/icons-material/ViewWeek';
+import AbcIcon from '@mui/icons-material/Abc';
+import RadioIcon from '@mui/icons-material/Radio';
+import AddCircleOutlinedIcon from '@mui/icons-material/AddCircleOutlined';
+import FormatSizeIcon from '@mui/icons-material/FormatSize';
+
 import type {
   SubtitleItem,
   WeddingContextData,
   SubtitleLayoutMode,
   SubtitleFontStyle,
+  TranslationSessionInfo,
+  ViewMode,
 } from '../types';
+import { StreamingSubtitleText } from './StreamingSubtitleText';
 
 interface MobileViewProps {
   subtitles: SubtitleItem[];
   activePartial: SubtitleItem | null;
   wedding: WeddingContextData;
+  sessionInfo?: TranslationSessionInfo;
   isDarkTheme?: boolean;
   onToggleTheme?: () => void;
   onOpenQrCode?: () => void;
+  onSelectView?: (view: ViewMode) => void;
+  onOpenNewSession?: () => void;
+  isSessionActive?: boolean;
 }
 
 const PREFS_KEY = 'stones_wedding_guest_prefs';
@@ -50,45 +82,67 @@ export const MobileView: React.FC<MobileViewProps> = ({
   subtitles,
   activePartial,
   wedding,
+  sessionInfo,
   isDarkTheme = true,
   onToggleTheme,
   onOpenQrCode,
+  onSelectView,
+  onOpenNewSession,
+  isSessionActive = false,
 }) => {
   const [layoutMode, setLayoutModeState] = useState<SubtitleLayoutMode>(() => loadGuestPrefs().layoutMode);
   const [fontStyle, setFontStyleState] = useState<SubtitleFontStyle>(() => loadGuestPrefs().fontStyle);
   const [fontSize, setFontSizeState] = useState<'normal' | 'large'>(() => loadGuestPrefs().fontSize);
   const [autoScroll, setAutoScroll] = useState(true);
-  const [copied, setCopied] = useState(false);
+  const [copiedLink, setCopiedLink] = useState(false);
+  const [copiedCardId, setCopiedCardId] = useState<number | null>(null);
 
-  // Remember the guest's reading preferences across reloads (e.g. reopening the
-  // page later in the reception) without touching the shared theme storage key.
+  const bottomRef = useRef<HTMLDivElement>(null);
+
+  const handleSpeak = (text: string) => {
+    if (!('speechSynthesis' in window)) return;
+    window.speechSynthesis.cancel();
+    const utterance = new SpeechSynthesisUtterance(text);
+    utterance.lang = 'en-US';
+    utterance.rate = 1.0;
+    window.speechSynthesis.speak(utterance);
+  };
+
+  const handleCopyText = (id: number, text: string) => {
+    navigator.clipboard.writeText(text).then(() => {
+      setCopiedCardId(id);
+      setTimeout(() => setCopiedCardId(null), 2000);
+    });
+  };
+
   const setLayoutMode = (mode: SubtitleLayoutMode) => {
     setLayoutModeState(mode);
     try {
       localStorage.setItem(PREFS_KEY, JSON.stringify({ layoutMode: mode, fontStyle, fontSize }));
     } catch {
-      // Private browsing or storage disabled — preference just won't persist.
+      // Ignore private mode storage failure
     }
   };
+
   const setFontStyle = (style: SubtitleFontStyle) => {
     setFontStyleState(style);
     try {
       localStorage.setItem(PREFS_KEY, JSON.stringify({ layoutMode, fontStyle: style, fontSize }));
     } catch {
-      // Private browsing or storage disabled — preference just won't persist.
+      // Ignore private mode storage failure
     }
   };
+
   const setFontSize = (size: 'normal' | 'large') => {
     setFontSizeState(size);
     try {
       localStorage.setItem(PREFS_KEY, JSON.stringify({ layoutMode, fontStyle, fontSize: size }));
     } catch {
-      // Private browsing or storage disabled — preference just won't persist.
+      // Ignore private mode storage failure
     }
   };
 
-  // Keep the guest's screen awake while this view is open — ceremonies and
-  // speeches run long, and a locked screen would stop subtitles being read.
+  // Screen WakeLock to keep screen on during wedding speeches
   useEffect(() => {
     if (!('wakeLock' in navigator)) return;
     let sentinel: WakeLockSentinel | null = null;
@@ -102,58 +156,50 @@ export const MobileView: React.FC<MobileViewProps> = ({
           return;
         }
         sentinel = lock;
-        // The browser also releases the lock on its own (e.g. tab backgrounded);
-        // clear our reference so handleVisibility knows to re-acquire it.
         lock.addEventListener('release', () => {
           if (sentinel === lock) sentinel = null;
         });
       } catch {
-        // Denied or unsupported in this context (e.g. low battery) — subtitles still work.
+        // Ignored
       }
     };
 
     requestLock();
-
-    // The OS releases the lock whenever the tab is backgrounded, so re-acquire
-    // it when the guest switches back.
     const handleVisibility = () => {
-      if (document.visibilityState === 'visible' && !sentinel) requestLock();
+      if (document.visibilityState === 'visible' && !sentinel) {
+        requestLock();
+      }
     };
     document.addEventListener('visibilitychange', handleVisibility);
 
     return () => {
       cancelled = true;
       document.removeEventListener('visibilitychange', handleVisibility);
-      sentinel?.release().catch(() => {});
+      if (sentinel) {
+        sentinel.release().catch(() => {});
+      }
     };
   }, []);
 
-  const bottomRef = useRef<HTMLDivElement>(null);
-
-  const isNearBottom = () => {
-    const el = bottomRef.current;
-    return !!el && el.getBoundingClientRect().bottom - window.innerHeight < 64;
-  };
-
+  // Smooth auto-scroll
   useEffect(() => {
     if (autoScroll && bottomRef.current) {
-      bottomRef.current.scrollIntoView({ behavior: 'smooth', block: 'end' });
+      bottomRef.current.scrollIntoView({ behavior: 'smooth' });
     }
   }, [subtitles, activePartial, autoScroll]);
 
-  // Stop following the live feed once the guest scrolls up to reread, and resume
-  // when they come back to the bottom. Pausing is driven by user gestures (not
-  // scroll events) so our own smooth-scroll animation can't trip it.
+  // Pause auto-scroll on manual scroll
   useEffect(() => {
-    const isVisible = () => !!bottomRef.current?.offsetParent;
+    const isNearBottom = () => {
+      const threshold = 120;
+      const scrollPos = window.innerHeight + window.scrollY;
+      return document.documentElement.scrollHeight - scrollPos <= threshold;
+    };
     const pauseIfAway = () => {
-      if (!isVisible()) return;
-      requestAnimationFrame(() => {
-        if (!isNearBottom()) setAutoScroll(false);
-      });
+      if (!isNearBottom()) setAutoScroll(false);
     };
     const resumeIfAtBottom = () => {
-      if (isVisible() && isNearBottom()) setAutoScroll(true);
+      if (isNearBottom()) setAutoScroll(true);
     };
     window.addEventListener('wheel', pauseIfAway, { passive: true });
     window.addEventListener('touchmove', pauseIfAway, { passive: true });
@@ -179,474 +225,659 @@ export const MobileView: React.FC<MobileViewProps> = ({
       }
     } else {
       navigator.clipboard.writeText(url).then(() => {
-        setCopied(true);
-        setTimeout(() => setCopied(false), 2000);
+        setCopiedLink(true);
+        setTimeout(() => setCopiedLink(false), 2000);
       });
     }
   };
 
-  const fontClass = fontStyle === 'serif' ? 'font-serif' : 'font-sans';
-  const zhSize = fontSize === 'large' ? 'text-lg sm:text-xl' : 'text-base sm:text-lg';
-  const enSize = fontSize === 'large' ? 'text-2xl sm:text-3xl' : 'text-lg sm:text-xl';
-
-  // 40px+ touch targets; :active (not :hover) so taps don't leave sticky hover states
-  const ctrlBase =
-    'h-10 min-w-10 px-2.5 inline-flex items-center justify-center gap-1.5 rounded-lg border text-[11px] font-sans uppercase tracking-wider font-semibold transition-colors active:scale-95';
-  const ctrlIdle = isDarkTheme
-    ? 'bg-[#22201D] border-[rgba(194,162,101,0.25)] text-stone-300 active:text-[#DFCA9B]'
-    : 'bg-[#F2ECE3] border-[#DFD7CB] text-stone-700 active:text-stone-900';
-  const ctrlActive = isDarkTheme
-    ? 'bg-[#C2A265] text-[#141311] border-[#C2A265]'
-    : 'bg-[#1C1A17] text-[#FAF8F5] border-[#1C1A17]';
-  const segBtn = (active: boolean) =>
-    `h-10 min-w-10 px-2.5 rounded-md items-center justify-center gap-1.5 text-[11px] font-sans uppercase tracking-wider font-semibold transition-colors ${
-      active ? ctrlActive : isDarkTheme ? 'text-stone-400' : 'text-stone-500'
-    }`;
+  const isDark = isDarkTheme;
+  const zhFontSx = {
+    fontFamily: fontStyle === 'serif' ? '"Source Serif 4", Georgia, serif' : 'inherit',
+    fontSize: fontSize === 'large' ? '1.05rem' : '0.9375rem',
+    lineHeight: 1.6,
+  };
+  const enFontSx = {
+    fontFamily: fontStyle === 'serif' ? '"Source Serif 4", Georgia, serif' : 'inherit',
+    fontSize: fontSize === 'large' ? '1.35rem' : '1.15rem',
+    lineHeight: 1.55,
+  };
 
   return (
-    <div className="max-w-2xl mx-auto min-h-[calc(100dvh-4rem)] flex flex-col justify-between p-4 sm:p-6 pb-20">
-      {/* Wedding Program Header Banner */}
-      <div
-        className={`text-center py-4 sm:py-6 border-b mb-4 transition-colors ${
-          isDarkTheme ? 'border-[rgba(194,162,101,0.2)]' : 'border-[#DFD7CB]'
-        }`}
-      >
-        <p className="font-sans text-[11px] uppercase tracking-[0.2em] text-[#C2A265] mb-1 font-medium">
-          Stones of the Yarra Valley • The Stable
-        </p>
-        <h2
-          className={`font-serif text-2xl sm:text-3xl font-normal tracking-wide transition-colors ${
-            isDarkTheme ? 'text-[#FAF8F5]' : 'text-[#1C1A17]'
-          }`}
-        >
-          {wedding.bride_name} &amp; {wedding.groom_name}
-        </h2>
-        <p
-          className={`font-serif italic text-xs mt-1 transition-colors ${
-            isDarkTheme ? 'text-stone-400' : 'text-stone-500'
-          }`}
-        >
-          Live Simultaneous Ceremony &amp; Reception Interpretation
-        </p>
-
-        {/* Invite other guests */}
-        <div className="mt-4 flex items-center justify-center gap-2">
-          <button onClick={handleShare} className={`${ctrlBase} ${ctrlIdle}`}>
-            {copied ? <Check className="w-4 h-4 text-emerald-500" /> : <Share2 className="w-4 h-4" />}
-            <span>{copied ? 'Link copied' : 'Share link'}</span>
-          </button>
-          {onOpenQrCode && (
-            <button onClick={onOpenQrCode} className={`${ctrlBase} ${ctrlIdle}`}>
-              <QrCode className="w-4 h-4" />
-              <span>QR code</span>
-            </button>
-          )}
-        </div>
-      </div>
-
-      {/* Sticky reading controls (top-16 = header height) */}
-      <div
-        className={`sticky top-16 z-20 backdrop-blur-md p-1.5 rounded-xl border shadow-sm mb-5 flex flex-wrap items-center justify-between gap-x-2 gap-y-1.5 transition-colors ${
-          isDarkTheme
-            ? 'bg-[#1B1A18]/92 border-[rgba(194,162,101,0.25)] text-stone-200'
-            : 'bg-[#FAF8F5]/95 border-[#DFD7CB] text-stone-800'
-        }`}
-      >
-        <div className="flex items-center gap-2 pl-1.5">
-          <div className="w-2 h-2 rounded-full bg-[#C2A265] animate-ping" />
-          <span
-            className={`text-[11px] font-sans uppercase tracking-widest font-semibold ${
-              isDarkTheme ? 'text-[#DFCA9B]' : 'text-stone-800'
-            }`}
+    <Box
+      sx={{
+        minHeight: 'calc(100dvh - 4rem)',
+        pb: { xs: 12, md: 8 },
+        px: { xs: 2, sm: 3 },
+      }}
+    >
+      <Container maxWidth="md" sx={{ px: { xs: 0, sm: 2 } }}>
+        {/* Minimalist Top Notice for Speaker */}
+        {onSelectView && (
+          <Box
+            sx={{
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              py: 1,
+              px: 2,
+              mt: 2,
+              mb: 2.5,
+              borderRadius: '999px',
+              bgcolor: isDark ? 'rgba(255, 255, 255, 0.04)' : 'rgba(0, 0, 0, 0.03)',
+              border: '1px solid',
+              borderColor: isDark ? 'rgba(255, 255, 255, 0.08)' : 'rgba(0, 0, 0, 0.06)',
+            }}
           >
-            Live
-          </span>
-        </div>
-
-        <div className="flex items-center gap-1.5">
-          {/* Layout: Stacked / Split (sm+ only; identical to Stacked on phones) / English only */}
-          <div
-            className={`flex items-center p-0.5 rounded-lg border ${
-              isDarkTheme ? 'bg-[#141312]/80 border-[rgba(194,162,101,0.2)]' : 'bg-stone-200/60 border-stone-300'
-            }`}
-            role="group"
-            aria-label="Subtitle layout"
-          >
-            <button
-              onClick={() => setLayoutMode('stacked')}
-              className={`inline-flex ${segBtn(layoutMode === 'stacked')}`}
-              aria-label="Chinese and English"
-              title="Chinese and English"
+            <Typography variant="caption" sx={{ color: 'text.secondary', fontSize: '0.78rem' }}>
+              Speaking or hosting? Broadcast your speech live
+            </Typography>
+            <Button
+              size="small"
+              onClick={() => onSelectView('speaker')}
+              sx={{
+                fontSize: '0.74rem',
+                py: 0.25,
+                px: 1.5,
+                color: isDark ? '#70A5F9' : '#1A73E8',
+                fontWeight: 600,
+              }}
             >
-              <Rows2 className="w-4 h-4" />
-              <span className="hidden sm:inline">Stacked</span>
-            </button>
-            <button
-              onClick={() => setLayoutMode('side-by-side')}
-              className={`hidden sm:inline-flex ${segBtn(layoutMode === 'side-by-side')}`}
-              aria-label="Side by side"
-              title="Side by side"
-            >
-              <Columns2 className="w-4 h-4" />
-              <span>Split</span>
-            </button>
-            <button
-              onClick={() => setLayoutMode('english')}
-              className={`inline-flex ${segBtn(layoutMode === 'english')}`}
-              aria-label="English only"
-              title="English only"
-            >
-              <Languages className="w-4 h-4" />
-              <span className="hidden sm:inline">EN</span>
-            </button>
-          </div>
-
-          <button
-            onClick={() => setFontStyle(fontStyle === 'serif' ? 'sans' : 'serif')}
-            className={`${ctrlBase} ${ctrlIdle}`}
-            aria-label={fontStyle === 'serif' ? 'Switch to sans-serif font' : 'Switch to serif font'}
-          >
-            {fontStyle === 'serif' ? 'Serif' : 'Sans'}
-          </button>
-
-          <button
-            onClick={() => setFontSize(fontSize === 'normal' ? 'large' : 'normal')}
-            className={`${ctrlBase} ${fontSize === 'large' ? ctrlActive : ctrlIdle}`}
-            aria-label="Toggle larger text"
-            aria-pressed={fontSize === 'large'}
-          >
-            <Type className="w-4 h-4" />
-          </button>
-
-          {onToggleTheme && (
-            <button
-              onClick={onToggleTheme}
-              className={`${ctrlBase} ${ctrlIdle}`}
-              aria-label={isDarkTheme ? 'Switch to daylight theme' : 'Switch to candlelight theme'}
-            >
-              {isDarkTheme ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
-            </button>
-          )}
-        </div>
-      </div>
-
-      {/* Main Subtitle Feed */}
-      <div className="flex-1 space-y-4">
-        {subtitles.length === 0 && !activePartial ? (
-          <div className="py-20 text-center space-y-4">
-            <div
-              className={`inline-flex p-3.5 rounded-full border transition-colors ${
-                isDarkTheme
-                  ? 'bg-[#1B1A18] border-[rgba(194,162,101,0.25)] text-[#DFCA9B]'
-                  : 'bg-[#F5EFEB] border-[#DFD7CB] text-[#C2A265]'
-              }`}
-            >
-              <Sparkles className="w-6 h-6 animate-pulse" />
-            </div>
-            <h3
-              className={`text-xl font-serif transition-colors ${
-                isDarkTheme ? 'text-[#FAF8F5]' : 'text-[#1C1A17]'
-              }`}
-            >
-              Welcome to the Celebration
-            </h3>
-            <p
-              className={`font-serif italic text-sm max-w-xs mx-auto leading-relaxed transition-colors ${
-                isDarkTheme ? 'text-stone-400' : 'text-stone-500'
-              }`}
-            >
-              Live English subtitles will stream to your screen automatically when speech begins.
-            </p>
-          </div>
-        ) : (
-          <>
-            {subtitles.map((item) => (
-              <div
-                key={item.id}
-                className={`p-4 sm:p-5 rounded-xl border shadow-xs transition-all ${
-                  isDarkTheme
-                    ? 'bg-[#1B1A18] border-[rgba(194,162,101,0.22)] hover:border-[#C2A265]/50'
-                    : 'bg-[#FAF8F5] border-[#DFD7CB] hover:border-[#C2A265]/40'
-                }`}
-              >
-                <div className="flex justify-between items-center text-[11px] text-stone-400 font-mono tracking-wider mb-2.5">
-                  <span className="font-semibold text-stone-500">#{item.id}</span>
-                  <span>{item.timestamp}</span>
-                </div>
-
-                {layoutMode === 'side-by-side' ? (
-                  /* ================= SIDE-BY-SIDE SPLIT CARD ================= */
-                  <div className="grid grid-cols-1 sm:grid-cols-12 gap-3 sm:gap-4 items-start">
-                    {/* Left: Chinese Transcript */}
-                    <div className="sm:col-span-5 space-y-1">
-                      <div className="flex items-center space-x-1.5">
-                        <span
-                          className={`px-1.5 py-0.5 rounded text-[11px] font-sans font-bold tracking-wider uppercase border ${
-                            isDarkTheme
-                              ? 'bg-stone-800/80 border-stone-700 text-stone-300'
-                              : 'bg-stone-200 border-stone-300 text-stone-700'
-                          }`}
-                        >
-                          ZH
-                        </span>
-                        <span className="text-[11px] font-sans uppercase tracking-widest text-stone-400">
-                          Mandarin
-                        </span>
-                      </div>
-                      <p
-                        className={`font-sans leading-relaxed transition-colors ${
-                          isDarkTheme ? 'text-stone-300' : 'text-stone-700'
-                        } ${zhSize}`}
-                      >
-                        {item.chinese || '—'}
-                      </p>
-                    </div>
-
-                    {/* Right: English Translation */}
-                    <div
-                      className={`sm:col-span-7 space-y-1 sm:border-l sm:pl-4 transition-colors ${
-                        isDarkTheme ? 'sm:border-[rgba(194,162,101,0.2)]' : 'sm:border-[#DFD7CB]'
-                      }`}
-                    >
-                      <div className="flex items-center space-x-1.5">
-                        <span className="px-1.5 py-0.5 rounded text-[11px] font-sans font-bold tracking-wider uppercase bg-[#C2A265]/20 border border-[#C2A265]/40 text-[#DFCA9B]">
-                          EN
-                        </span>
-                        <span className="text-[11px] font-sans uppercase tracking-widest text-[#C2A265]">
-                          English
-                        </span>
-                      </div>
-                      <p
-                        className={`${fontClass} font-medium leading-relaxed transition-colors ${
-                          isDarkTheme
-                            ? 'text-[#FAF8F5] drop-shadow-[0_1px_8px_rgba(223,202,155,0.18)]'
-                            : 'text-[#1C1A17]'
-                        } ${enSize}`}
-                      >
-                        {item.english}
-                      </p>
-                    </div>
-                  </div>
-                ) : (
-                  /* ================= STACKED / ENGLISH ONLY CARD ================= */
-                  <div className="space-y-2">
-                    {layoutMode !== 'english' && item.chinese && (
-                      <div className="space-y-1">
-                        <div className="flex items-center space-x-1.5">
-                          <span
-                            className={`px-1.5 py-0.5 rounded text-[11px] font-sans font-bold tracking-wider uppercase border ${
-                              isDarkTheme
-                                ? 'bg-stone-800/80 border-stone-700 text-stone-300'
-                                : 'bg-stone-200 border-stone-300 text-stone-700'
-                            }`}
-                          >
-                            ZH
-                          </span>
-                          <span className="text-[11px] font-sans uppercase tracking-widest text-stone-400">
-                            Spoken Mandarin
-                          </span>
-                        </div>
-                        <p
-                          className={`font-sans leading-relaxed transition-colors ${
-                            isDarkTheme ? 'text-stone-300' : 'text-stone-700'
-                          } ${zhSize}`}
-                        >
-                          {item.chinese}
-                        </p>
-                      </div>
-                    )}
-
-                    <div className="space-y-1">
-                      {layoutMode !== 'english' && (
-                        <div className="flex items-center space-x-1.5 pt-1">
-                          <span className="px-1.5 py-0.5 rounded text-[11px] font-sans font-bold tracking-wider uppercase bg-[#C2A265]/20 border border-[#C2A265]/40 text-[#DFCA9B]">
-                            EN
-                          </span>
-                          <span className="text-[11px] font-sans uppercase tracking-widest text-[#C2A265]">
-                            English Interpretation
-                          </span>
-                        </div>
-                      )}
-                      <p
-                        className={`${fontClass} font-medium leading-relaxed transition-colors ${
-                          isDarkTheme
-                            ? 'text-[#FAF8F5] drop-shadow-[0_1px_8px_rgba(223,202,155,0.18)]'
-                            : 'text-[#1C1A17]'
-                        } ${enSize}`}
-                      >
-                        {item.english}
-                      </p>
-                    </div>
-                  </div>
-                )}
-              </div>
-            ))}
-
-            {/* Live Interpreting Bubble */}
-            {activePartial && (
-              <div
-                className={`p-4 sm:p-5 rounded-xl border-2 shadow-lg transition-all animate-subtle-pulse ${
-                  isDarkTheme
-                    ? 'bg-[#22201D] border-[#C2A265] shadow-[#C2A265]/10'
-                    : 'bg-[#FFFDF9] border-[#C2A265]'
-                }`}
-              >
-                <div className="flex justify-between items-center text-[11px] text-[#C2A265] font-sans tracking-widest uppercase font-bold mb-2.5">
-                  <span className="flex items-center space-x-1.5">
-                    <span className="w-2 h-2 rounded-full bg-[#C2A265] animate-ping" />
-                    <span>Live Translation...</span>
-                  </span>
-                  <span className="font-mono text-stone-400 font-normal">{activePartial.timestamp}</span>
-                </div>
-
-                {layoutMode === 'side-by-side' ? (
-                  /* Live Side-by-Side */
-                  <div className="grid grid-cols-1 sm:grid-cols-12 gap-3 sm:gap-4 items-start">
-                    <div className="sm:col-span-5 space-y-1">
-                      <div className="flex items-center space-x-1.5">
-                        <span
-                          className={`px-1.5 py-0.5 rounded text-[11px] font-sans font-bold tracking-wider uppercase border ${
-                            isDarkTheme
-                              ? 'bg-stone-800/80 border-stone-700 text-stone-300'
-                              : 'bg-stone-200 border-stone-300 text-stone-700'
-                          }`}
-                        >
-                          ZH
-                        </span>
-                        <span className="text-[11px] font-sans uppercase tracking-widest text-stone-400">
-                          Mandarin
-                        </span>
-                      </div>
-                      <p
-                        className={`font-sans leading-relaxed transition-colors ${
-                          isDarkTheme ? 'text-stone-300' : 'text-stone-700'
-                        } ${zhSize}`}
-                      >
-                        {activePartial.chinese || 'Listening...'}
-                      </p>
-                    </div>
-
-                    <div
-                      className={`sm:col-span-7 space-y-1 sm:border-l sm:pl-4 transition-colors ${
-                        isDarkTheme ? 'sm:border-[rgba(194,162,101,0.2)]' : 'sm:border-[#DFD7CB]'
-                      }`}
-                    >
-                      <div className="flex items-center space-x-1.5">
-                        <span className="px-1.5 py-0.5 rounded text-[11px] font-sans font-bold tracking-wider uppercase bg-[#C2A265]/20 border border-[#C2A265]/40 text-[#DFCA9B]">
-                          EN
-                        </span>
-                        <span className="text-[11px] font-sans uppercase tracking-widest text-[#C2A265]">
-                          English
-                        </span>
-                      </div>
-                      <p
-                        className={`${fontClass} font-semibold leading-relaxed transition-colors ${
-                          isDarkTheme
-                            ? 'text-[#FAF8F5] drop-shadow-[0_1px_8px_rgba(223,202,155,0.22)]'
-                            : 'text-[#1C1A17]'
-                        } ${enSize}`}
-                      >
-                        <span>{activePartial.english}</span>
-                        <span className="inline-block w-1.5 h-4 ml-1.5 bg-[#C2A265] animate-pulse align-middle" />
-                      </p>
-                    </div>
-                  </div>
-                ) : (
-                  /* Live Stacked / English */
-                  <div className="space-y-2">
-                    {layoutMode !== 'english' && activePartial.chinese && (
-                      <div className="space-y-1">
-                        <div className="flex items-center space-x-1.5">
-                          <span
-                            className={`px-1.5 py-0.5 rounded text-[11px] font-sans font-bold tracking-wider uppercase border ${
-                              isDarkTheme
-                                ? 'bg-stone-800/80 border-stone-700 text-stone-300'
-                                : 'bg-stone-200 border-stone-300 text-stone-700'
-                            }`}
-                          >
-                            ZH
-                          </span>
-                          <span className="text-[11px] font-sans uppercase tracking-widest text-stone-400">
-                            Spoken Mandarin
-                          </span>
-                        </div>
-                        <p
-                          className={`font-sans leading-relaxed transition-colors ${
-                            isDarkTheme ? 'text-stone-300' : 'text-stone-700'
-                          } ${zhSize}`}
-                        >
-                          {activePartial.chinese}
-                        </p>
-                      </div>
-                    )}
-
-                    <div className="space-y-1">
-                      {layoutMode !== 'english' && (
-                        <div className="flex items-center space-x-1.5 pt-1">
-                          <span className="px-1.5 py-0.5 rounded text-[11px] font-sans font-bold tracking-wider uppercase bg-[#C2A265]/20 border border-[#C2A265]/40 text-[#DFCA9B]">
-                            EN
-                          </span>
-                          <span className="text-[11px] font-sans uppercase tracking-widest text-[#C2A265]">
-                            English Interpretation
-                          </span>
-                        </div>
-                      )}
-                      <p
-                        className={`${fontClass} font-semibold leading-relaxed transition-colors ${
-                          isDarkTheme
-                            ? 'text-[#FAF8F5] drop-shadow-[0_1px_8px_rgba(223,202,155,0.22)]'
-                            : 'text-[#1C1A17]'
-                        } ${enSize}`}
-                      >
-                        <span>{activePartial.english}</span>
-                        <span className="inline-block w-1.5 h-4 ml-1.5 bg-[#C2A265] animate-pulse align-middle" />
-                      </p>
-                    </div>
-                  </div>
-                )}
-              </div>
-            )}
-          </>
+              Open Speaker Deck →
+            </Button>
+          </Box>
         )}
-        <div ref={bottomRef} className="scroll-mb-6" />
-      </div>
 
-      {/* Program Footer */}
-      <div
-        className={`pt-8 pb-4 text-center border-t mt-8 space-y-1 transition-colors ${
-          isDarkTheme ? 'border-[rgba(194,162,101,0.2)] text-stone-400' : 'border-[#DFD7CB] text-stone-500'
-        }`}
-      >
-        <p className="font-serif italic text-xs">
-          Stones of the Yarra Valley • The Stable
-        </p>
-        <p
-          className={`font-sans text-[11px] uppercase tracking-widest ${
-            isDarkTheme ? 'text-stone-500' : 'text-stone-400'
-          }`}
+        {/* Wedding Couple Header - Minimalist Editorial Aesthetic */}
+        <Box sx={{ textAlign: 'center', mt: 3, mb: 3 }}>
+          <Typography
+            variant="caption"
+            sx={{
+              display: 'block',
+              fontWeight: 600,
+              letterSpacing: '0.12em',
+              textTransform: 'uppercase',
+              color: 'text.secondary',
+              fontSize: '0.7rem',
+              mb: 0.5,
+            }}
+          >
+            Stones of the Yarra Valley
+          </Typography>
+
+          <Typography
+            variant="h3"
+            component="h1"
+            sx={{
+              fontWeight: 600,
+              fontFamily: '"Outfit", sans-serif',
+              letterSpacing: '-0.025em',
+              fontSize: { xs: '1.75rem', sm: '2.25rem' },
+              color: 'text.primary',
+            }}
+          >
+            {wedding.bride_name} &amp; {wedding.groom_name}
+          </Typography>
+
+          {/* Minimalist Bilingual Pill */}
+          <Stack direction="row" spacing={1} sx={{ justifyContent: 'center', alignItems: 'center', mt: 1.5 }}>
+            <Box
+              sx={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: 1,
+                px: 1.75,
+                py: 0.4,
+                borderRadius: '999px',
+                border: '1px solid',
+                borderColor: isDark ? 'rgba(255, 255, 255, 0.1)' : 'rgba(0, 0, 0, 0.08)',
+                bgcolor: isDark ? 'rgba(255, 255, 255, 0.03)' : 'rgba(0, 0, 0, 0.02)',
+              }}
+            >
+              <Typography variant="caption" sx={{ fontWeight: 500, color: 'text.secondary', fontSize: '0.75rem' }}>
+                Mandarin ⇄ English Live
+              </Typography>
+            </Box>
+
+            {sessionInfo && (
+              <Chip
+                label={`#${sessionInfo.session_number}: ${sessionInfo.session_title}`}
+                size="small"
+                sx={{
+                  bgcolor: isDark ? 'rgba(255, 255, 255, 0.04)' : 'rgba(0, 0, 0, 0.04)',
+                  color: 'text.secondary',
+                  fontSize: '0.7rem',
+                  height: 24,
+                }}
+              />
+            )}
+
+            {isSessionActive && (
+              <Chip
+                icon={<RadioIcon sx={{ fontSize: '0.8rem !important' }} />}
+                label="LIVE"
+                size="small"
+                color="error"
+                sx={{
+                  height: 24,
+                  fontSize: '0.68rem',
+                  fontWeight: 600,
+                }}
+              />
+            )}
+          </Stack>
+
+          {/* Quick Share / QR Actions */}
+          <Stack direction="row" spacing={1} sx={{ justifyContent: 'center', mt: 1.5 }}>
+            <Button
+              variant="outlined"
+              size="small"
+              onClick={handleShare}
+              startIcon={copiedLink ? <CheckIcon sx={{ color: 'success.main' }} /> : <ShareIcon />}
+              sx={{
+                borderRadius: '999px',
+                py: 0.35,
+                px: 1.5,
+                fontSize: '0.72rem',
+                borderColor: isDark ? 'rgba(255, 255, 255, 0.12)' : 'rgba(0, 0, 0, 0.12)',
+                color: 'text.secondary',
+              }}
+            >
+              {copiedLink ? 'Link Copied' : 'Share'}
+            </Button>
+
+            {onOpenQrCode && (
+              <Button
+                variant="outlined"
+                size="small"
+                onClick={onOpenQrCode}
+                startIcon={<QrCode2Icon />}
+                sx={{
+                  borderRadius: '999px',
+                  py: 0.35,
+                  px: 1.5,
+                  fontSize: '0.72rem',
+                  borderColor: isDark ? 'rgba(255, 255, 255, 0.12)' : 'rgba(0, 0, 0, 0.12)',
+                  color: 'text.secondary',
+                }}
+              >
+                QR Code
+              </Button>
+            )}
+          </Stack>
+        </Box>
+
+        {/* Minimalist Floating Reading Controls Capsule */}
+        <Paper
+          elevation={0}
+          sx={{
+            position: 'sticky',
+            top: 68,
+            zIndex: 10,
+            py: 0.75,
+            px: { xs: 1.5, sm: 2 },
+            mb: 3,
+            borderRadius: '999px',
+            bgcolor: isDark ? alpha('#121316', 0.9) : alpha('#FFFFFF', 0.9),
+            backdropFilter: 'blur(16px)',
+            border: '1px solid',
+            borderColor: isDark ? 'rgba(255, 255, 255, 0.1)' : 'rgba(0, 0, 0, 0.08)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            gap: 1,
+          }}
         >
-          Wishing Joy &amp; Xinrong a lifetime of happiness
-        </p>
-      </div>
+          {/* Status Indicator */}
+          <Stack direction="row" spacing={1} sx={{ alignItems: 'center', pl: 0.5 }}>
+            <Box
+              sx={{
+                width: 7,
+                height: 7,
+                borderRadius: '50%',
+                bgcolor: isSessionActive ? '#EF4444' : '#22C55E',
+              }}
+            />
+            <Typography
+              variant="caption"
+              sx={{
+                fontWeight: 600,
+                fontSize: '0.72rem',
+                color: 'text.secondary',
+                letterSpacing: '0.04em',
+              }}
+            >
+              {isSessionActive ? 'STREAMING' : 'READY'}
+            </Typography>
+          </Stack>
 
-      {/* Floating Auto-Scroll Toggle Button */}
+          {/* Controls: Layout, Serif/Sans, Size, Theme */}
+          <Stack direction="row" spacing={0.75} sx={{ alignItems: 'center' }}>
+            <ToggleButtonGroup
+              size="small"
+              value={layoutMode}
+              exclusive
+              onChange={(_, val) => {
+                if (val) setLayoutMode(val);
+              }}
+              sx={{
+                borderRadius: '999px',
+                p: 0.25,
+                bgcolor: isDark ? 'rgba(255, 255, 255, 0.05)' : 'rgba(0, 0, 0, 0.04)',
+                '& .MuiToggleButton-root': {
+                  borderRadius: '999px !important',
+                  border: 'none',
+                  px: { xs: 1, sm: 1.25 },
+                  py: 0.25,
+                  fontSize: '0.72rem',
+                  fontWeight: 500,
+                  textTransform: 'none',
+                  color: 'text.secondary',
+                  '&.Mui-selected': {
+                    bgcolor: isDark ? '#F4F4F5' : '#18181B',
+                    color: isDark ? '#090A0B' : '#FFFFFF',
+                  },
+                },
+              }}
+            >
+              <ToggleButton value="stacked" aria-label="Stacked Chinese and English">
+                <TableRowsIcon sx={{ fontSize: '0.9rem', mr: { xs: 0, sm: 0.5 } }} />
+                <Box component="span" sx={{ display: { xs: 'none', sm: 'inline' } }}>Stacked</Box>
+              </ToggleButton>
+              <ToggleButton value="side-by-side" aria-label="Split View" sx={{ display: { xs: 'none', sm: 'inline-flex' } }}>
+                <ViewWeekIcon sx={{ fontSize: '0.9rem', mr: 0.5 }} />
+                <span>Split</span>
+              </ToggleButton>
+              <ToggleButton value="english" aria-label="English Only">
+                <AbcIcon sx={{ fontSize: '1rem', mr: { xs: 0, sm: 0.5 } }} />
+                <Box component="span" sx={{ display: { xs: 'none', sm: 'inline' } }}>EN</Box>
+              </ToggleButton>
+            </ToggleButtonGroup>
+
+            <Tooltip title={fontStyle === 'serif' ? 'Switch to Sans-serif font' : 'Switch to Serif font'}>
+              <Button
+                size="small"
+                onClick={() => setFontStyle(fontStyle === 'serif' ? 'sans' : 'serif')}
+                sx={{
+                  borderRadius: '999px',
+                  minWidth: 32,
+                  height: 28,
+                  px: 1,
+                  fontSize: '0.72rem',
+                  fontWeight: 500,
+                  color: 'text.secondary',
+                }}
+              >
+                {fontStyle === 'serif' ? 'Serif' : 'Sans'}
+              </Button>
+            </Tooltip>
+
+            <Tooltip title="Toggle font size">
+              <IconButton
+                size="small"
+                onClick={() => setFontSize(fontSize === 'normal' ? 'large' : 'normal')}
+                sx={{
+                  width: 28,
+                  height: 28,
+                  color: fontSize === 'large' ? (isDark ? '#70A5F9' : '#1A73E8') : 'text.secondary',
+                }}
+              >
+                <FormatSizeIcon sx={{ fontSize: '0.95rem' }} />
+              </IconButton>
+            </Tooltip>
+
+            {onToggleTheme && (
+              <Tooltip title={isDark ? 'Switch to Light Mode' : 'Switch to Dark Mode'}>
+                <IconButton
+                  size="small"
+                  onClick={onToggleTheme}
+                  sx={{ width: 28, height: 28, color: 'text.secondary' }}
+                >
+                  {isDark ? <LightModeIcon sx={{ fontSize: '0.95rem' }} /> : <DarkModeIcon sx={{ fontSize: '0.95rem' }} />}
+                </IconButton>
+              </Tooltip>
+            )}
+          </Stack>
+        </Paper>
+
+        {/* Translation Subtitles Feed - Clean Minimalist Flow */}
+        <Stack spacing={2}>
+          {subtitles.length === 0 && !activePartial ? (
+            <Box
+              sx={{
+                py: 10,
+                px: 3,
+                textAlign: 'center',
+                borderRadius: '18px',
+                border: '1px dashed',
+                borderColor: isDark ? 'rgba(255, 255, 255, 0.12)' : 'rgba(0, 0, 0, 0.12)',
+              }}
+            >
+              <Typography
+                variant="subtitle1"
+                sx={{
+                  fontWeight: 600,
+                  color: 'text.primary',
+                  mb: 0.5,
+                }}
+              >
+                Welcome to the Celebration
+              </Typography>
+              <Typography
+                variant="body2"
+                sx={{
+                  color: 'text.secondary',
+                  maxWidth: 360,
+                  mx: 'auto',
+                  lineHeight: 1.6,
+                }}
+              >
+                Live English subtitles will stream to your screen automatically when speech begins.
+              </Typography>
+            </Box>
+          ) : (
+            <>
+              {subtitles.map((item) => (
+                <Card
+                  key={item.id}
+                  sx={{
+                    borderRadius: '16px',
+                    bgcolor: isDark ? '#121316' : '#FFFFFF',
+                    border: '1px solid',
+                    borderColor: isDark ? 'rgba(255, 255, 255, 0.08)' : 'rgba(0, 0, 0, 0.07)',
+                    transition: 'border-color 0.15s ease',
+                    '&:hover': {
+                      borderColor: isDark ? 'rgba(255, 255, 255, 0.16)' : 'rgba(0, 0, 0, 0.16)',
+                    },
+                  }}
+                >
+                  <CardContent sx={{ p: { xs: 2, sm: 2.5 }, '&:last-child': { pb: 2 } }}>
+                    {layoutMode === 'side-by-side' ? (
+                      /* Split View Layout */
+                      <Box
+                        sx={{
+                          display: 'grid',
+                          gridTemplateColumns: { xs: '1fr', sm: '5fr 7fr' },
+                          gap: 2,
+                        }}
+                      >
+                        <Box>
+                          <Typography sx={{ color: 'text.secondary', ...zhFontSx }}>
+                            {item.chinese || '—'}
+                          </Typography>
+                        </Box>
+                        <Box sx={{ borderLeft: { sm: '1px solid' }, borderColor: 'divider', pl: { sm: 2 } }}>
+                          <Typography sx={{ color: 'text.primary', fontWeight: 550, ...enFontSx }}>
+                            {item.english}
+                          </Typography>
+                        </Box>
+                      </Box>
+                    ) : (
+                      /* Stacked Editorial Layout */
+                      <Stack spacing={1}>
+                        {layoutMode !== 'english' && item.chinese && (
+                          <Typography sx={{ color: 'text.secondary', ...zhFontSx }}>
+                            {item.chinese}
+                          </Typography>
+                        )}
+                        <Typography sx={{ color: 'text.primary', fontWeight: 550, ...enFontSx }}>
+                          {item.english}
+                        </Typography>
+                      </Stack>
+                    )}
+
+                    {/* Minimalist Micro Action Bar */}
+                    <Box
+                      sx={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'space-between',
+                        pt: 1.25,
+                        mt: 1.25,
+                        borderTop: '1px solid',
+                        borderColor: isDark ? 'rgba(255, 255, 255, 0.05)' : 'rgba(0, 0, 0, 0.05)',
+                      }}
+                    >
+                      <Typography variant="caption" sx={{ color: 'text.secondary', fontFamily: 'monospace', fontSize: '0.72rem' }}>
+                        {item.timestamp}
+                      </Typography>
+
+                      <Stack direction="row" spacing={0.5}>
+                        <IconButton
+                          size="small"
+                          onClick={() => handleSpeak(item.english)}
+                          sx={{ color: 'text.secondary' }}
+                          title="Listen (Speech Synthesis)"
+                        >
+                          <VolumeUpIcon sx={{ fontSize: '0.95rem' }} />
+                        </IconButton>
+                        <IconButton
+                          size="small"
+                          onClick={() => handleCopyText(item.id, item.english)}
+                          sx={{ color: 'text.secondary' }}
+                          title="Copy text"
+                        >
+                          {copiedCardId === item.id ? (
+                            <CheckIcon sx={{ fontSize: '0.95rem', color: 'success.main' }} />
+                          ) : (
+                            <ContentCopyIcon sx={{ fontSize: '0.95rem' }} />
+                          )}
+                        </IconButton>
+                      </Stack>
+                    </Box>
+                  </CardContent>
+                </Card>
+              ))}
+
+              {/* Real-time Streaming Live Interpretation Row */}
+              {activePartial && (
+                <Card
+                  sx={{
+                    borderRadius: '16px',
+                    bgcolor: isDark ? '#141417' : '#FFFFFF',
+                    border: '1px solid',
+                    borderColor: isDark ? '#70A5F9' : '#1A73E8',
+                    position: 'relative',
+                  }}
+                >
+                  <CardContent sx={{ p: { xs: 2, sm: 2.5 } }}>
+                    <Stack direction="row" sx={{ mb: 1, justifyContent: 'space-between', alignItems: 'center' }}>
+                      <Stack direction="row" spacing={1} sx={{ alignItems: 'center' }}>
+                        <Box
+                          sx={{
+                            width: 7,
+                            height: 7,
+                            borderRadius: '50%',
+                            bgcolor: isDark ? '#70A5F9' : '#1A73E8',
+                            animation: 'pulse 1.2s infinite',
+                          }}
+                        />
+                        <Typography
+                          variant="caption"
+                          sx={{
+                            fontWeight: 600,
+                            color: isDark ? '#70A5F9' : '#1A73E8',
+                            letterSpacing: '0.04em',
+                            fontSize: '0.72rem',
+                          }}
+                        >
+                          LIVE INTERPRETING...
+                        </Typography>
+                      </Stack>
+                      <Typography variant="caption" sx={{ color: 'text.secondary', fontFamily: 'monospace', fontSize: '0.72rem' }}>
+                        {activePartial.timestamp}
+                      </Typography>
+                    </Stack>
+
+                    {layoutMode === 'side-by-side' ? (
+                      <Box
+                        sx={{
+                          display: 'grid',
+                          gridTemplateColumns: { xs: '1fr', sm: '5fr 7fr' },
+                          gap: 2,
+                        }}
+                      >
+                        <Box>
+                          <Typography sx={{ color: 'text.secondary', ...zhFontSx }}>
+                            <StreamingSubtitleText
+                              text={activePartial.chinese || ''}
+                              isChinese
+                              showCursor={false}
+                            />
+                          </Typography>
+                        </Box>
+                        <Box sx={{ borderLeft: { sm: '1px solid' }, borderColor: 'divider', pl: { sm: 2 } }}>
+                          <Typography sx={{ color: 'text.primary', fontWeight: 550, ...enFontSx }}>
+                            <StreamingSubtitleText
+                              text={activePartial.english}
+                              isChinese={false}
+                              showCursor
+                              cursorColor={isDark ? '#70A5F9' : '#1A73E8'}
+                            />
+                          </Typography>
+                        </Box>
+                      </Box>
+                    ) : (
+                      <>
+                        {activePartial.chinese && layoutMode !== 'english' && (
+                          <Typography sx={{ color: 'text.secondary', mb: 0.75, ...zhFontSx }}>
+                            <StreamingSubtitleText
+                              text={activePartial.chinese}
+                              isChinese
+                              showCursor={false}
+                            />
+                          </Typography>
+                        )}
+
+                        <Typography sx={{ color: 'text.primary', fontWeight: 550, ...enFontSx }}>
+                          <StreamingSubtitleText
+                            text={activePartial.english}
+                            isChinese={false}
+                            showCursor
+                            cursorColor={isDark ? '#70A5F9' : '#1A73E8'}
+                          />
+                        </Typography>
+                      </>
+                    )}
+                  </CardContent>
+                </Card>
+              )}
+            </>
+          )}
+
+          <div ref={bottomRef} style={{ scrollMarginBottom: 32 }} />
+        </Stack>
+
+        {/* Minimalist Wedding Footer */}
+        <Box
+          sx={{
+            pt: 6,
+            pb: 4,
+            textAlign: 'center',
+            borderTop: '1px solid',
+            borderColor: isDark ? 'rgba(255, 255, 255, 0.06)' : 'rgba(0, 0, 0, 0.06)',
+            mt: 6,
+          }}
+        >
+          <Typography variant="caption" sx={{ display: 'block', fontWeight: 500, color: 'text.secondary' }}>
+            Stones of the Yarra Valley • The Stable
+          </Typography>
+          <Typography variant="caption" sx={{ color: 'text.secondary', opacity: 0.8 }}>
+            Wishing {wedding.bride_name} &amp; {wedding.groom_name} a lifetime of happiness
+          </Typography>
+        </Box>
+      </Container>
+
+      {/* Floating Auto-Scroll Button */}
       {!autoScroll && (
-        <button
+        <Fab
+          size="small"
           onClick={() => {
             setAutoScroll(true);
             bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
           }}
-          className={`fixed bottom-[calc(1.5rem+env(safe-area-inset-bottom))] right-4 z-30 h-12 px-5 rounded-full shadow-xl flex items-center gap-2 text-xs font-sans uppercase tracking-widest font-semibold transition-all active:scale-95 ${
-            isDarkTheme
-              ? 'bg-[#C2A265] text-[#141311]'
-              : 'bg-[#1C1A17] text-[#FAF8F5]'
-          }`}
+          sx={{
+            position: 'fixed',
+            bottom: { xs: 72, sm: 28 },
+            right: 20,
+            zIndex: 30,
+            bgcolor: isDark ? '#F4F4F5' : '#18181B',
+            color: isDark ? '#090A0B' : '#FFFFFF',
+            boxShadow: 'none',
+            '&:hover': {
+              bgcolor: isDark ? '#FFFFFF' : '#27272A',
+            },
+          }}
         >
-          <ArrowDown className="w-4 h-4" />
-          <span>Latest</span>
-        </button>
+          <KeyboardArrowDownIcon />
+        </Fab>
       )}
-    </div>
+
+      {/* Minimalist Bottom Navigation Bar */}
+      {onSelectView && (
+        <Paper
+          elevation={0}
+          sx={{
+            position: 'fixed',
+            bottom: 0,
+            left: 0,
+            right: 0,
+            zIndex: 40,
+            borderTop: '1px solid',
+            borderColor: isDark ? 'rgba(255, 255, 255, 0.08)' : 'rgba(0, 0, 0, 0.08)',
+            bgcolor: isDark ? alpha('#090A0B', 0.94) : alpha('#FAFAFA', 0.94),
+            backdropFilter: 'blur(16px)',
+          }}
+        >
+          <BottomNavigation
+            showLabels
+            value="mobile"
+            onChange={(_, newValue) => {
+              if (newValue === 'new-session') {
+                if (onOpenNewSession) onOpenNewSession();
+              } else {
+                onSelectView(newValue as ViewMode);
+              }
+            }}
+            sx={{
+              bgcolor: 'transparent',
+              height: 56,
+              '& .MuiBottomNavigationAction-root': {
+                color: 'text.secondary',
+                minWidth: 'auto',
+                py: 0.5,
+                '&.Mui-selected': {
+                  color: isDark ? '#F4F4F5' : '#18181B',
+                  fontWeight: 600,
+                },
+              },
+            }}
+          >
+            <BottomNavigationAction
+              label="Guest View"
+              value="mobile"
+              icon={<PhoneIphoneIcon sx={{ fontSize: '1.15rem' }} />}
+            />
+            <BottomNavigationAction
+              label="Speaker Deck"
+              value="speaker"
+              icon={<MicIcon sx={{ fontSize: '1.15rem' }} />}
+            />
+            <BottomNavigationAction
+              label="Projector"
+              value="projector"
+              icon={<DesktopWindowsIcon sx={{ fontSize: '1.15rem' }} />}
+            />
+            {onOpenNewSession && (
+              <BottomNavigationAction
+                label="New Session"
+                value="new-session"
+                icon={<AddCircleOutlinedIcon sx={{ fontSize: '1.15rem' }} />}
+              />
+            )}
+          </BottomNavigation>
+        </Paper>
+      )}
+    </Box>
   );
 };
-

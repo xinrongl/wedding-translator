@@ -4,7 +4,7 @@ A lightweight, low-latency, real-time speech translation web service designed sp
 
 It interprets spoken **Mandarin Chinese (Simplified)**—including natural **English code-switching** (mixed English words, phrases, and personal names)—and streams **fluent English subtitles** in real time.
 
-Built natively on Google's **Gemini Live Translation API** (`gemini-3.5-live-translate-preview`) using the official [`google-gemini/gemini-live-api-examples`](https://github.com/google-gemini/gemini-live-api-examples) architectural pattern.
+Built natively on Google's **Gemini 3.8 Live** (`gemini-3.8-live`) 1-step direct multimodal speech translation API using the official Google GenAI Python SDK (`google-genai`).
 
 ---
 
@@ -21,23 +21,23 @@ Built natively on Google's **Gemini Live Translation API** (`gemini-3.5-live-tra
 |                          FastAPI Asynchronous Gateway                           |
 |                                                                                 |
 |   Audio Ingestion Bridge                         Broadcast Hub                  |
-|   - Ingests 16kHz PCM chunks                     - Pushes live bilingual        |
+|   - Ingests 16kHz PCM chunks                     - Pushes live English          |
 |   - Decoupled async queues                         subtitles to Projector,      |
-|   - Forwards directly to                           Mobile, & Admin Screens      |
-|     Gemini Live Session                            (/ws/subtitles)              |
+|   - Streams directly into                          Mobile, & Console Displays   |
+|     Gemini 3.8 Live Session                        (/ws/subtitles)              |
 +----------------------------------------+----------------------------------------+
                                          |
                          Bidirectional   |   Real-time Audio In
-                            WebSocket    |   Simultaneous Transcripts Out
+                            WebSocket    |   Simultaneous Translated Tokens Out
                                          v
 +---------------------------------------------------------------------------------+
-|                       Google Gemini Live Translation API                        |
-|                    Model: gemini-3.5-live-translate-preview                     |
-|                    Location: global (Vertex AI ADC Auth)                        |
+|                       Google Gemini 3.8 Live Translation                        |
+|                            Model: gemini-3.8-live                               |
+|                Backend: Vertex AI (Accenture) or AI Studio (Personal)           |
 |                                                                                 |
-|   - Real-time Input Transcription (Chinese + Mixed English)                     |
-|   - Real-time Output Transcription (Translated English Subtitles)               |
-|   - Ultra-Low End-to-End Latency (~300-500ms)                                   |
+|   - 1-Step Direct Simultaneous Translation (Chinese speech -> English text)     |
+|   - Parallel Bilingual Transcription Grounding                                  |
+|   - Immediate Sub-Second Token Streaming (Google Translate Live style)         |
 +---------------------------------------------------------------------------------+
 ```
 

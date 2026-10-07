@@ -1,113 +1,81 @@
 @import "tailwindcss";
 
 @theme {
-  --font-serif: "Playfair Display", Georgia, "Times New Roman", serif;
-  --font-sans: "Plus Jakarta Sans", system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  --font-sans: "Outfit", "Google Sans", "Plus Jakarta Sans", "Roboto", system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  --font-serif: "Playfair Display", Georgia, serif;
 
-  /* Stones of the Yarra Valley Authentic Palette */
-  --color-stones-paper: #FAF8F5;
-  --color-stones-cream: #F5EFEB;
-  --color-stones-linen: #ECE5DC;
-  --color-stones-border: #DFD7CB;
-  --color-stones-charcoal: #1C1A17;
-  --color-stones-noir: #141311;
-  --color-stones-muted: #7A746C;
-  --color-stones-soft: #9E968B;
+  /* Modern Google & Android Material Design 3 Palette */
+  --color-google-blue: #1A73E8;
+  --color-google-blue-m3: #0B57D0;
+  --color-google-blue-container: #D3E3FD;
+  --color-google-blue-on-container: #041E49;
+  --color-google-red: #EA4335;
+  --color-google-yellow: #FBBC04;
+  --color-google-green: #34A853;
 
-  /* Stones Warm Gold / Brushed Brass */
-  --color-stones-gold: #C2A265;
-  --color-stones-gold-light: #DFCA9B;
-  --color-stones-gold-dark: #98783E;
-  --color-stones-champagne: #F4EBD9;
+  /* Android Light M3 Surfaces */
+  --color-android-bg: #F8FAFD;
+  --color-android-surface: #FFFFFF;
+  --color-android-container: #F0F4F9;
+  --color-android-container-high: #E9EEF6;
+  --color-android-outline: #74777F;
+  --color-android-outline-variant: #E0E2EC;
+  --color-android-text-primary: #1F1F1F;
+  --color-android-text-secondary: #444746;
 
-  /* Estate Nature Accents */
-  --color-stones-sage: #5F6B56;
-  --color-stones-sage-light: #7E8D73;
-  --color-stones-terracotta: #A6685B;
-
-  /* The Stable Candlelight / Dark Aesthetic */
-  --color-stones-dark-bg: #141312;
-  --color-stones-dark-surface: #1B1A18;
-  --color-stones-dark-card: #22201D;
-  --color-stones-dark-border: rgba(194, 162, 101, 0.22);
+  /* Android Dark M3 Surfaces */
+  --color-android-dark-bg: #121316;
+  --color-android-dark-surface: #1E1F22;
+  --color-android-dark-container: #282A2E;
+  --color-android-dark-container-high: #313338;
+  --color-android-dark-outline: #8E9199;
+  --color-android-dark-outline-variant: rgba(255, 255, 255, 0.1);
+  --color-android-dark-text-primary: #E2E2E6;
+  --color-android-dark-text-secondary: #C4C6D0;
+  --color-android-dark-primary: #A8C7FA;
+  --color-android-dark-primary-container: #004A77;
 }
 
 @layer base {
   body {
-    background-color: var(--color-stones-paper);
-    color: var(--color-stones-charcoal);
+    background-color: var(--color-android-bg);
+    color: var(--color-android-text-primary);
     font-family: var(--font-sans);
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
     overflow-x: hidden;
   }
-
-  h1, h2, h3, h4, .font-editorial {
-    font-family: var(--font-serif);
-  }
 }
 
-/* Elegant wedding typography & subtle luxury accents */
-.tracking-estate {
-  letter-spacing: 0.18em;
+/* Android M3 Elevation & Pill Utilities */
+.m3-pill {
+  border-radius: 9999px;
 }
 
-.tracking-wide-caps {
-  letter-spacing: 0.14em;
+.m3-card {
+  border-radius: 24px;
 }
 
-/* Subtle paper texture overlay */
-.bg-paper-texture {
-  background-color: #FAF8F5;
-  background-image: radial-gradient(rgba(28, 26, 23, 0.03) 1px, transparent 1px);
-  background-size: 24px 24px;
+.m3-dialog {
+  border-radius: 28px;
 }
 
-/* The Stable Candlelight glowing aura */
-.glow-candlelight {
-  text-shadow: 0 0 25px rgba(223, 202, 155, 0.45), 0 0 50px rgba(194, 162, 101, 0.25);
+/* Google 4-Color Gradient Accent Line */
+.google-gradient-bar {
+  background: linear-gradient(90deg, #4285F4 0%, #EA4335 33%, #FBBC04 66%, #34A853 100%);
 }
 
-.glow-card-gold {
-  box-shadow: 0 10px 40px -10px rgba(194, 162, 101, 0.15), 0 0 1px 1px rgba(194, 162, 101, 0.2);
+/* Subtle Android M3 Elevation */
+.m3-elevation-1 {
+  box-shadow: 0 1px 3px 1px rgba(0, 0, 0, 0.08), 0 1px 2px 0 rgba(0, 0, 0, 0.12);
 }
 
-.glow-card-soft {
-  box-shadow: 0 8px 30px rgba(28, 26, 23, 0.04);
+.m3-elevation-2 {
+  box-shadow: 0 2px 6px 2px rgba(0, 0, 0, 0.08), 0 1px 2px 0 rgba(0, 0, 0, 0.12);
 }
 
-/* Stones signature outline button */
-.btn-stones-outline {
-  border: 1px solid rgba(28, 26, 23, 0.35);
-  background-color: transparent;
-  color: #1C1A17;
-  font-size: 11px;
-  font-weight: 600;
-  letter-spacing: 0.18em;
-  text-transform: uppercase;
-  transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
-}
-
-.btn-stones-outline:hover {
-  background-color: #1C1A17;
-  color: #FAF8F5;
-  border-color: #1C1A17;
-}
-
-/* Stones gold luxury button */
-.btn-stones-gold {
-  background-color: #C2A265;
-  color: #141311;
-  font-size: 11px;
-  font-weight: 600;
-  letter-spacing: 0.18em;
-  text-transform: uppercase;
-  transition: all 0.3s ease;
-}
-
-.btn-stones-gold:hover {
-  background-color: #D4BC88;
-  box-shadow: 0 4px 15px rgba(194, 162, 101, 0.3);
+.m3-elevation-3 {
+  box-shadow: 0 4px 12px 3px rgba(0, 0, 0, 0.1), 0 1px 3px 0 rgba(0, 0, 0, 0.15);
 }
 
 @keyframes pulse-subtle {
@@ -118,4 +86,3 @@
 .animate-subtle-pulse {
   animation: pulse-subtle 3s ease-in-out infinite;
 }
-
