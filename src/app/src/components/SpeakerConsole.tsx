@@ -293,69 +293,62 @@ export const SpeakerConsole: React.FC<SpeakerConsoleProps> = ({
               isDarkTheme ? 'border-[rgba(194,162,101,0.2)]' : 'border-[#DFD7CB]'
             }`}
           >
-            <div>
-              <label
-                className={`block text-[10px] uppercase tracking-widest mb-1.5 ${
-                  isDarkTheme ? 'text-stone-400' : 'text-stone-500'
-                }`}
-              >
-                Speaker Sign-In
-              </label>
-
-              {!oauthClientId && (
-                <p className="mb-2 text-[11px] text-amber-500 leading-relaxed">
-                  GOOGLE_OAUTH_CLIENT_ID is not configured on the backend — the speaker
-                  microphone is currently open to anyone with this link. Set it before the
-                  wedding.
-                </p>
-              )}
-
-              {oauthClientId && googleUser && (
-                <div
-                  className={`flex items-center justify-between gap-2 rounded-md border px-3 py-2 mb-2 transition-colors ${
-                    isDarkTheme
-                      ? 'bg-[#141311] border-[rgba(194,162,101,0.25)]'
-                      : 'bg-white border-[#DFD7CB]'
+            {oauthClientId && (
+              <div>
+                <label
+                  className={`block text-[10px] uppercase tracking-widest mb-1.5 ${
+                    isDarkTheme ? 'text-stone-400' : 'text-stone-500'
                   }`}
                 >
-                  <div className="flex items-center gap-2 min-w-0">
-                    {googleUser.picture && (
-                      <img
-                        src={googleUser.picture}
-                        alt=""
-                        referrerPolicy="no-referrer"
-                        className="w-6 h-6 rounded-full flex-shrink-0"
-                      />
-                    )}
-                    <div className="min-w-0">
-                      <p
-                        className={`truncate text-xs font-semibold ${
-                          isDarkTheme ? 'text-[#FAF8F5]' : 'text-[#1C1A17]'
-                        }`}
-                      >
-                        {googleUser.name}
-                      </p>
-                      <p className="truncate text-[10px] text-stone-400">{googleUser.email}</p>
-                    </div>
-                  </div>
-                  <button
-                    onClick={handleSignOut}
-                    disabled={isStreaming}
-                    className={`flex-shrink-0 text-[10px] uppercase tracking-widest font-semibold px-2 py-1 rounded border transition-colors disabled:opacity-40 ${
+                  Speaker Sign-In
+                </label>
+
+                {googleUser && (
+                  <div
+                    className={`flex items-center justify-between gap-2 rounded-md border px-3 py-2 mb-2 transition-colors ${
                       isDarkTheme
-                        ? 'border-[rgba(194,162,101,0.3)] text-stone-300 hover:bg-[#22201D]'
-                        : 'border-[#1C1A17]/25 text-stone-700 hover:bg-[#1C1A17] hover:text-[#FAF8F5]'
+                        ? 'bg-[#141311] border-[rgba(194,162,101,0.25)]'
+                        : 'bg-white border-[#DFD7CB]'
                     }`}
                   >
-                    Sign out
-                  </button>
-                </div>
-              )}
+                    <div className="flex items-center gap-2 min-w-0">
+                      {googleUser.picture && (
+                        <img
+                          src={googleUser.picture}
+                          alt=""
+                          referrerPolicy="no-referrer"
+                          className="w-6 h-6 rounded-full flex-shrink-0"
+                        />
+                      )}
+                      <div className="min-w-0">
+                        <p
+                          className={`truncate text-xs font-semibold ${
+                            isDarkTheme ? 'text-[#FAF8F5]' : 'text-[#1C1A17]'
+                          }`}
+                        >
+                          {googleUser.name}
+                        </p>
+                        <p className="truncate text-[10px] text-stone-400">{googleUser.email}</p>
+                      </div>
+                    </div>
+                    <button
+                      onClick={handleSignOut}
+                      disabled={isStreaming}
+                      className={`flex-shrink-0 text-[10px] uppercase tracking-widest font-semibold px-2 py-1 rounded border transition-colors disabled:opacity-40 ${
+                        isDarkTheme
+                          ? 'border-[rgba(194,162,101,0.3)] text-stone-300 hover:bg-[#22201D]'
+                          : 'border-[#1C1A17]/25 text-stone-700 hover:bg-[#1C1A17] hover:text-[#FAF8F5]'
+                      }`}
+                    >
+                      Sign out
+                    </button>
+                  </div>
+                )}
 
-              {/* GIS renders its own button here; kept mounted (hidden, not unmounted) so it
-                  doesn't need to be re-rendered every time sign-in state changes. */}
-              <div ref={googleButtonRef} className={googleUser ? 'hidden' : ''} />
-            </div>
+                {/* GIS renders its own button here; kept mounted (hidden, not unmounted) */}
+                <div ref={googleButtonRef} className={googleUser ? 'hidden' : ''} />
+              </div>
+            )}
             <button
               onClick={toggleStreaming}
               disabled={!isStreaming && !!oauthClientId && !idToken}
@@ -476,7 +469,7 @@ export const SpeakerConsole: React.FC<SpeakerConsoleProps> = ({
               >
                 <dt className={isDarkTheme ? 'text-stone-400' : 'text-stone-500'}>Architecture</dt>
                 <dd className={`font-semibold ${isDarkTheme ? 'text-emerald-400' : 'text-emerald-800'}`}>
-                  Two-Step (ASR + Flash LLM)
+                  1-Step Direct Live
                 </dd>
               </div>
               <div
@@ -484,37 +477,23 @@ export const SpeakerConsole: React.FC<SpeakerConsoleProps> = ({
                   isDarkTheme ? 'border-[rgba(194,162,101,0.15)]' : 'border-[#EAE3D9]'
                 }`}
               >
-                <dt className={isDarkTheme ? 'text-stone-400' : 'text-stone-500'}>Live ASR</dt>
+                <dt className={isDarkTheme ? 'text-stone-400' : 'text-stone-500'}>Live Engine</dt>
                 <dd
                   className={`font-mono text-[11px] text-right transition-colors ${
                     isDarkTheme ? 'text-stone-400' : 'text-stone-600'
                   }`}
                 >
-                  {backendConfig?.transcribe_model || 'gemini-3.5-transcribe-live-preview'}
-                </dd>
-              </div>
-              <div
-                className={`flex justify-between py-1 border-b transition-colors ${
-                  isDarkTheme ? 'border-[rgba(194,162,101,0.15)]' : 'border-[#EAE3D9]'
-                }`}
-              >
-                <dt className={isDarkTheme ? 'text-stone-400' : 'text-stone-500'}>Translation</dt>
-                <dd
-                  className={`font-mono text-[11px] text-right transition-colors ${
-                    isDarkTheme ? 'text-stone-400' : 'text-stone-600'
-                  }`}
-                >
-                  {backendConfig?.translation_model || 'gemini-3.5-flash'}
+                  {backendConfig?.live_model || 'gemini-3.8-live'}
                 </dd>
               </div>
               <div className="flex justify-between py-1">
-                <dt className={isDarkTheme ? 'text-stone-400' : 'text-stone-500'}>GCP Region</dt>
+                <dt className={isDarkTheme ? 'text-stone-400' : 'text-stone-500'}>Backend</dt>
                 <dd
                   className={`font-mono text-[11px] transition-colors ${
                     isDarkTheme ? 'text-stone-400' : 'text-stone-600'
                   }`}
                 >
-                  global (Vertex AI)
+                  {backendConfig?.use_vertex ? 'Vertex AI' : 'Google AI Studio'}
                 </dd>
               </div>
             </dl>

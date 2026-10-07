@@ -61,8 +61,19 @@ export class AudioCaptureService {
 
     try {
       // 1. Request microphone access with acoustic settings optimized for speech recognition
-      // Note: Setting aggressive noiseSuppression=true often clips initial Chinese consonants (zh/ch/sh/j/q/x).
-      // We set ideal constraints so browsers preserve consonant frequency fidelity and phonetic dynamics.
+      // Note: Browsers only expose navigator.mediaDevices in a Secure Context (HTTPS or localhost).
+      if (!navigator.mediaDevices || typeof navigator.mediaDevices.getUserMedia !== 'function') {
+        const isSecure = typeof window !== 'undefined' && window.isSecureContext;
+        if (!isSecure) {
+          throw new Error(
+            `Microphone access is blocked because this page is not in a Secure Context. Please open http://localhost:${window.location.port || '8000'}/speaker or use HTTPS.`
+          );
+        }
+        throw new Error(
+          'Microphone capture is not supported by this browser or permissions are denied.'
+        );
+      }
+
       this.mediaStream = await navigator.mediaDevices.getUserMedia({
         audio: {
           channelCount: 1,

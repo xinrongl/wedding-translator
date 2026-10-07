@@ -16,12 +16,11 @@ export interface WeddingContextData {
 export interface BackendConfig {
   project_id: string;
   location: string;
-  transcribe_model: string;
-  translation_model: string;
+  live_model: string;
+  use_vertex: boolean;
   source_language: string;
   target_language: string;
   wedding: WeddingContextData;
-  enable_live_audio_stream: boolean;
   google_oauth_client_id: string | null;
 }
 
@@ -32,17 +31,18 @@ export type SubtitleLayoutMode = 'stacked' | 'side-by-side' | 'english';
 export type SubtitleFontStyle = 'serif' | 'sans';
 
 export interface LiveEvent {
-  type: 'init' | 'partial' | 'interim' | 'final' | 'interrupted' | 'transcript_cleared' | 'audio_level' | 'session_status';
+  type: 'init' | 'partial' | 'interim' | 'final' | 'interrupted' | 'transcript_cleared' | 'audio_level' | 'session_status' | 'error';
   id?: number;
   chinese?: string;
   english?: string;
   timestamp?: string;
   level?: number;
   status?: string;
+  live_model?: string;
+  use_vertex?: boolean;
   history?: SubtitleItem[];
   wedding?: WeddingContextData;
-  transcribe_model?: string;
-  translation_model?: string;
   source_language?: string;
   target_language?: string;
+  error?: string;
 }

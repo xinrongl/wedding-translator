@@ -92,11 +92,7 @@ export function App() {
         connectionStatus={connectionStatus}
         isSessionActive={isSessionActive}
         wedding={wedding}
-        liveModel={
-          backendConfig?.transcribe_model && backendConfig?.translation_model
-            ? `${backendConfig.transcribe_model} + ${backendConfig.translation_model}`
-            : 'gemini-3.5-transcribe + gemini-3.5-flash'
-        }
+        liveModel={backendConfig?.live_model || 'gemini-3.8-live'}
         isDark={isDarkTheme}
         onToggleTheme={toggleTheme}
         isProjectorDark={isDarkTheme}

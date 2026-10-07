@@ -1,4 +1,4 @@
-"""Configuration settings and data models for the Wedding Translator."""
+"""Configuration models and environment settings for the Wedding Translator."""
 
 from pathlib import Path
 from typing import Literal
@@ -6,11 +6,11 @@ from typing import Literal
 from pydantic import BaseModel, Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
-ROOT = Path(__file__).parent.parent.parent
+ROOT = Path(__file__).resolve().parents[2]
 
 
 class AudioConfig(BaseModel):
-    """Audio specification for microphone capture and Speech-to-Text streaming."""
+    """Audio specification for microphone capture and speech streaming."""
 
     sample_rate: int = Field(
         default=16000, description="Sampling rate in Hz (16kHz recommended for STT)"
@@ -26,7 +26,7 @@ class AudioConfig(BaseModel):
 
     @property
     def chunk_size_bytes(self) -> int:
-        """Expected byte size of one audio frame (e.g., 16000 * 0.1 * 2 = 3200 bytes)."""
+        """Expected byte size of one audio frame (e.g., 16000 * 0.05 * 2 = 1600 bytes)."""
         return int(
             self.sample_rate * (self.chunk_duration_ms / 1000.0) * self.bytes_per_sample
         )
@@ -55,19 +55,19 @@ class WeddingContext(BaseSettings):
     )
     speaker_role: str = Field(
         default="",
-        description="Relationship/Role of the speaker (e.g., 'Father of the Bride', 'Best Man', 'Maid of Honor')",
+        description="Relationship/Role of the speaker (e.g. 'Best Man', 'Maid of Honor')",
     )
     custom_notes: str = Field(
         default="",
-        description="Special names, family terms, or tone instructions (e.g. 'Uncle Zhang', 'warm and humorous')",
+        description="Special names, family terms, or tone instructions",
     )
     custom_vocabulary: str = Field(
         default="",
-        description="Comma-separated custom vocabulary words or phonetic hints for speech recognition biasing",
+        description="Comma-separated custom vocabulary words for speech recognition biasing",
     )
 
     def get_vocabulary_list(self) -> list[str]:
-        """Generate comprehensive vocabulary biasing list for Chinese speech recognition and homophone disambiguation."""
+        """Generate vocabulary biasing list for Chinese speech recognition and homophone disambiguation."""
         vocab: list[str] = [
             # High-frequency wedding blessings & idioms
             "百年好合",
@@ -86,7 +86,7 @@ class WeddingContext(BaseSettings):
             "情比金坚",
             "互敬互爱",
             "美满幸福",
-            # Wedding ceremony roles & terms
+            # Ceremony roles & terms
             "新郎",
             "新娘",
             "伴郎",
@@ -117,7 +117,7 @@ class WeddingContext(BaseSettings):
                 clean = item.strip()
                 if clean and clean not in vocab:
                     vocab.append(clean)
-        if getattr(self, "venue", None):
+        if self.venue:
             for loc in [
                 self.venue,
                 "Stones of the Yarra Valley",
@@ -140,37 +140,34 @@ class WeddingContext(BaseSettings):
 
 
 def build_wedding_translation_instruction(ctx: WeddingContext | None = None) -> str:
-    """Build system instruction for the LLM text translation step in the two-step pipeline."""
+    """Build system instruction for Gemini 3.8 Live 1-step real-time speech translation."""
     c = ctx or WeddingContext()
     context_lines = [
-        f"Groom: {c.groom_name}",
-        f"Bride: {c.bride_name}",
-        f"Venue: {c.venue}",
-        "欣荣: Xinrong",
-        "顺顺: Joy",
+        f"- Groom: {c.groom_name} (Chinese: 欣荣 / 林欣荣)",
+        f"- Bride: {c.bride_name} (Chinese: 顺顺 / 赵雪)",
+        f"- Venue: {c.venue}",
     ]
     if c.speaker_role:
-        context_lines.append(f"Speaker Role: {c.speaker_role}")
+        context_lines.append(f"- Speaker Role: {c.speaker_role}")
     if c.custom_notes:
-        context_lines.append(f"Context Notes: {c.custom_notes}")
+        context_lines.append(f"- Special Notes & Tone: {c.custom_notes}")
 
     instructions = [
         "You are an expert real-time English subtitle translator for a bilingual wedding ceremony.",
-        "Your task: Translate spoken Chinese wedding speech into natural, elegant, fluent English subtitles.",
+        "Your mission: Listen to the incoming spoken audio (spoken in Chinese, occasionally mixed with English) and immediately stream natural, elegant, fluent English subtitles in real-time as the speaker talks.",
         "",
-        "Guidelines:",
-        "1. Output ONLY the English translation. Never output Chinese, explanations, notes, pinyin, or quotation marks.",
-        "2. Accurately translate traditional Chinese wedding blessings, idioms, and heartfelt sentiments into poetic, graceful English.",
-        "3. Preserve proper names, places, and embedded English words exactly as spoken. Wedding Context below:",
+        "Core Translation Rules:",
+        "1. Output ONLY English text subtitles. Never output Chinese characters, pinyin, phonetic guides, quotation marks, or meta comments.",
+        "2. Stream translations with minimal latency — output translated English words as soon as you hear each clause, just like Google Translate Live.",
+        "3. When Chinese is spoken: Translate directly into natural, heartfelt, and grammatically graceful English.",
+        "4. When English is spoken (code-switching): Transcribe and refine the English directly without translating it back to Chinese.",
+        "5. Accurately translate traditional Chinese wedding blessings, idioms, and heartfelt sentiments into poetic, graceful English (e.g., '百年好合' -> 'A lifetime of love and harmony', '白头偕老' -> 'Growing old together in love', '永结同心' -> 'Hearts joined forever in love', '新婚快乐' -> 'Happy wedding day').",
+        "6. Preserve proper names, roles, and locations accurately according to the Wedding Context below:",
         "\n".join(context_lines),
-        "4. Keep the translation concise, expressive, and immediately readable for a live audience.",
+        "7. Keep subtitles concise, expressive, and immediately readable on a projector screen for wedding guests.",
     ]
 
     return "\n".join(instructions)
-
-
-# Backward-compatible alias
-build_wedding_system_instruction = build_wedding_translation_instruction
 
 
 class Settings(BaseSettings):
@@ -185,7 +182,7 @@ class Settings(BaseSettings):
 
     # Project metadata
     project_name: str = "Joy & Xinrong Wedding Speech Translator"
-    version: str = "0.2.0"
+    version: str = "0.3.0"
 
     # Google Cloud & Vertex AI
     google_cloud_project: str | None = Field(
@@ -199,14 +196,19 @@ class Settings(BaseSettings):
         description="Google Cloud Run deployment region (Melbourne)",
     )
     google_cloud_location: str = Field(
-        default="global",
+        default="us-central1",
         alias="GOOGLE_CLOUD_LOCATION",
-        description="Vertex AI region (default: global)",
+        description="Vertex AI region for Gemini Live (default: us-central1)",
     )
     gemini_api_key: str | None = Field(
         default=None,
         alias="GEMINI_API_KEY",
-        description="API key for Gemini (optional when using ADC on Vertex AI)",
+        description="API key for Gemini (used in AI Studio / personal project)",
+    )
+    google_genai_use_vertexai: bool | None = Field(
+        default=None,
+        alias="GOOGLE_GENAI_USE_VERTEXAI",
+        description="Whether to use Vertex AI (True) or Google AI Studio (False). None = auto-detect.",
     )
     service_name: str = Field(
         default="wedding-translator",
@@ -214,12 +216,30 @@ class Settings(BaseSettings):
         description="Cloud Run service name",
     )
 
+    @property
+    def use_vertex(self) -> bool:
+        """Determine whether to use Vertex AI or Google AI Studio.
+
+        Resolution:
+        1. Explicit GOOGLE_GENAI_USE_VERTEXAI environment variable takes precedence.
+        2. If project contains 'accenture' or 'vertex' or equals 'ktzdeir-agbg-anz-gemini-vertex', True.
+        3. If project is personal ('canvas-aviary-302803') or GEMINI_API_KEY is provided without Vertex, False.
+        4. Default to True if a GCP project is configured without API key, else False.
+        """
+        if self.google_genai_use_vertexai is not None:
+            return self.google_genai_use_vertexai
+        if self.google_cloud_project:
+            proj = self.google_cloud_project.lower()
+            if "vertex" in proj or "accenture" in proj or proj == "ktzdeir-agbg-anz-gemini-vertex":
+                return True
+            return not (proj == "canvas-aviary-302803" or bool(self.gemini_api_key))
+        return False
+
     # Access Control (Sign in with Google)
     google_oauth_client_id: str | None = Field(
         default=None,
         alias="GOOGLE_OAUTH_CLIENT_ID",
-        description="OAuth 2.0 Web Client ID (Google Cloud Console > Credentials) used to verify "
-        "'Sign in with Google' ID tokens before opening /ws/speaker (unset = no gate)",
+        description="OAuth 2.0 Web Client ID used to verify 'Sign in with Google' ID tokens before opening /ws/speaker",
     )
     speaker_allowed_emails: str = Field(
         default="405896828.xl@gmail.com",
@@ -232,21 +252,11 @@ class Settings(BaseSettings):
         """Normalized (trimmed, lowercased) set of emails allowed to open /ws/speaker."""
         return {e.strip().lower() for e in self.speaker_allowed_emails.split(",") if e.strip()}
 
-    # Two-Step Pipeline Models (Gemini 3.5 Transcribe Live + Gemini 2.5 Flash)
-    transcribe_model: str = Field(
-        default="gemini-3.5-transcribe-live-preview",
-        alias="TRANSCRIBE_MODEL",
-        description="Gemini 3.5 Transcribe streaming ASR model",
-    )
-    translation_model: str = Field(
-        default="gemini-3.5-flash",
-        alias="TRANSLATION_MODEL",
-        description="Fast LLM translation model for Chinese-to-English wedding subtitles",
-    )
-    translation_thinking_budget: int = Field(
-        default=0,
-        alias="TRANSLATION_THINKING_BUDGET",
-        description="Thinking token budget for translation (0 = ultra-low latency direct translation)",
+    # Gemini 3.8 Live 1-Step Model
+    live_model: str = Field(
+        default="gemini-3.8-live",
+        alias="LIVE_MODEL",
+        description="Gemini 3.8 Live 1-step real-time streaming translation model",
     )
 
     source_language_description: str = Field(
@@ -259,45 +269,32 @@ class Settings(BaseSettings):
         alias="TARGET_LANGUAGE",
         description="Target translation language code (BCP-47) - always English",
     )
-    enable_live_audio_stream: bool = Field(
-        default=False,
-        alias="ENABLE_LIVE_AUDIO_STREAM",
-        description="Broadcast synthesized 24kHz English speech audio",
-    )
 
     # Speech-to-Text & Inference Tuning
     stt_language_codes: str = Field(
         default="zh-CN,en-US",
         alias="STT_LANGUAGE_CODES",
-        description="Comma-separated BCP-47 language codes for speech recognition (or 'auto' for auto-detect)",
+        description="Comma-separated BCP-47 language codes for speech recognition",
     )
     stt_mode: Literal["SMART", "VERBATIM"] = Field(
         default="SMART",
         alias="STT_MODE",
-        description="Speech recognition transcription mode: SMART (neural cleanup) or VERBATIM",
+        description="Speech recognition mode: SMART (neural cleanup) or VERBATIM",
     )
     temperature: float = Field(
         default=0.2,
         alias="TEMPERATURE",
-        description="Sampling temperature for translation and recognition determinism",
+        description="Sampling temperature for translation determinism",
     )
 
-    # Sub-configurations
-    audio: AudioConfig = Field(default_factory=AudioConfig)
+    # Wedding Context
     wedding: WeddingContext = Field(default_factory=WeddingContext)
 
-    # Server Host & Port
-    host: str = Field(default="0.0.0.0", alias="HOST", description="Server bind host")
-    port: int = Field(default=8000, alias="PORT", description="Server bind port")
-    reload: bool = Field(
-        default=False, alias="RELOAD", description="Enable auto-reload for development"
-    )
-
-    # logging
-    log_level: Literal["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"] = Field(
-        default="INFO", alias="LOG_LEVEL", description="Global log level."
-    )
+    # Server Runtime
+    host: str = Field(default="0.0.0.0", alias="HOST")
+    port: int = Field(default=8000, alias="PORT")
+    reload: bool = Field(default=False, alias="RELOAD")
+    log_level: str = Field(default="INFO", alias="LOG_LEVEL")
 
 
-# Global singleton settings instance
 settings = Settings()
