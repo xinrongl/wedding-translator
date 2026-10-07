@@ -74,6 +74,15 @@ def test_api_health_and_config():
     assert resp.status_code == 200
     assert resp.json()["status"] == "cleared"
 
+    # 5. New session
+    resp = client.post("/api/session/new", json={"title": "Vows Ceremony"})
+    assert resp.status_code == 200
+    sess_data = resp.json()
+    assert sess_data["status"] == "ok"
+    assert sess_data["session_title"] == "Vows Ceremony"
+    assert "session_id" in sess_data
+    assert "session_number" in sess_data
+
 
 @pytest.mark.asyncio
 async def test_gemini_live_session_lifecycle():

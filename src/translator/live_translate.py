@@ -144,14 +144,18 @@ class GeminiLiveTranslator:
                 parts=[types.Part(text=self.system_instruction)]
             ),
             input_audio_transcription=types.AudioTranscriptionConfig(
-                language_codes=lang_codes
-                if lang_codes and settings.stt_mode != "SMART"
-                else None,
+                language_codes=lang_codes if lang_codes else ["zh-CN", "en-US"],
                 mode=stt_mode,
                 custom_vocabulary=custom_vocab,
             ),
             realtime_input_config=types.RealtimeInputConfig(
                 turn_coverage="TURN_INCLUDES_ONLY_ACTIVITY",
+                automatic_activity_detection=types.AutomaticActivityDetection(
+                    start_of_speech_sensitivity=types.StartSensitivity.START_SENSITIVITY_HIGH,
+                    end_of_speech_sensitivity=types.EndSensitivity.END_SENSITIVITY_HIGH,
+                    silence_duration_ms=350,
+                    prefix_padding_ms=80,
+                ),
             ),
             temperature=settings.temperature,
         )

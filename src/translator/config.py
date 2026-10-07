@@ -69,40 +69,17 @@ class WeddingContext(BaseSettings):
     def get_vocabulary_list(self) -> list[str]:
         """Generate vocabulary biasing list for Chinese speech recognition and homophone disambiguation."""
         vocab: list[str] = [
-            # High-frequency wedding blessings & idioms
+            # Key wedding terms, blessings & roles
             "百年好合",
-            "白头偕老",
-            "早生贵子",
-            "永结同心",
-            "花好月圆",
             "新婚快乐",
-            "佳偶天成",
-            "天作之合",
-            "相濡以沫",
-            "携手并肩",
-            "鸾凤和鸣",
-            "心心相印",
-            "喜结连理",
-            "情比金坚",
-            "互敬互爱",
-            "美满幸福",
-            # Ceremony roles & terms
             "新郎",
             "新娘",
             "伴郎",
             "伴娘",
-            "主婚人",
-            "证婚人",
             "司仪",
-            "岳父",
-            "岳母",
-            "公公",
-            "婆婆",
             "各位来宾",
             "亲朋好友",
             "致辞",
-            "敬酒",
-            "交杯酒",
             "干杯",
             "Cheers",
         ]
@@ -124,8 +101,6 @@ class WeddingContext(BaseSettings):
                 "Yarra Valley",
                 "Coldstream",
                 "雅拉河谷",
-                "墨尔本",
-                "Melbourne",
             ]:
                 if loc not in vocab:
                     vocab.append(loc)
@@ -153,18 +128,17 @@ def build_wedding_translation_instruction(ctx: WeddingContext | None = None) -> 
         context_lines.append(f"- Special Notes & Tone: {c.custom_notes}")
 
     instructions = [
-        "You are an expert real-time English subtitle translator for a bilingual wedding ceremony.",
-        "Your mission: Listen to the incoming spoken audio (spoken in Chinese, occasionally mixed with English) and immediately stream natural, elegant, fluent English subtitles in real-time as the speaker talks.",
+        "You are an expert real-time simultaneous speech-to-English subtitle translator for a wedding ceremony.",
+        "Your mission: Listen to the incoming speech and immediately translate what is spoken into natural, fluent English subtitles in real-time.",
         "",
-        "Core Translation Rules:",
-        "1. Output ONLY English text subtitles. Never output Chinese characters, pinyin, phonetic guides, quotation marks, or meta comments.",
-        "2. Stream translations with minimal latency — output translated English words as soon as you hear each clause, just like Google Translate Live.",
-        "3. When Chinese is spoken: Translate directly into natural, heartfelt, and grammatically graceful English.",
-        "4. When English is spoken (code-switching): Transcribe and refine the English directly without translating it back to Chinese.",
-        "5. Accurately translate traditional Chinese wedding blessings, idioms, and heartfelt sentiments into poetic, graceful English (e.g., '百年好合' -> 'A lifetime of love and harmony', '白头偕老' -> 'Growing old together in love', '永结同心' -> 'Hearts joined forever in love', '新婚快乐' -> 'Happy wedding day').",
-        "6. Preserve proper names, roles, and locations accurately according to the Wedding Context below:",
+        "CRITICAL GROUNDING & ZERO-HALLUCINATION RULES:",
+        "1. TRANSLATE ONLY WHAT IS SPOKEN: Translate strictly and faithfully what the speaker literally says. Do NOT invent, assume, or extrapolate words that were not spoken.",
+        "2. NEVER HALLUCINATE CANNED SPEECHES: Under NO circumstances should you output generic ceremonial openings (such as 'Welcome everyone to this beautiful celebration of love' or 'Dear guests, welcome') unless the speaker explicitly utters those exact words.",
+        "3. CASUAL, TEST & OFF-HAND SPEECH: If the speaker asks questions, tests the microphone (e.g. 'mic check', 'can you hear me', '这个 translation 是不是有用的问题?'), makes a joke, or speaks off-topic, translate their exact meaning faithfully into English.",
+        "4. BILINGUAL CODE-SWITCHING: The speaker may mix English words (e.g., 'translation', 'love', 'cheers') into Chinese sentences. Transcribe and integrate the English naturally into the translated subtitle.",
+        "5. WEDDING CONTEXT & NAMES: When names, roles, or wedding blessings are genuinely spoken, translate them accurately and gracefully according to this context:",
         "\n".join(context_lines),
-        "7. Keep subtitles concise, expressive, and immediately readable on a projector screen for wedding guests.",
+        "6. SUBTITLE FORMAT: Output ONLY English text subtitles. Stream translations with minimal latency, like Google Translate Live. Never output Chinese characters, pinyin, timestamps, quotation marks, or conversational responses.",
     ]
 
     return "\n".join(instructions)
@@ -282,9 +256,9 @@ class Settings(BaseSettings):
         description="Speech recognition mode: SMART (neural cleanup) or VERBATIM",
     )
     temperature: float = Field(
-        default=0.2,
+        default=0.0,
         alias="TEMPERATURE",
-        description="Sampling temperature for translation determinism",
+        description="Sampling temperature for translation determinism (0.0 = maximum acoustic grounding)",
     )
 
     # Wedding Context

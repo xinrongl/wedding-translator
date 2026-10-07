@@ -118,6 +118,10 @@ class SessionManager:
         self._lock = asyncio.Lock()
         self.is_active = False
         self.history: list[SubtitleRecord] = []
+        self.session_number: int = 1
+        self.session_id: str = f"session_{int(time.time())}"
+        self.session_title: str = "Ceremony Speeches"
+        self.session_start_time: float = time.time()
 
     async def acquire_speaker_session(self) -> bool:
         """Attempt to acquire the exclusive speaker lock."""
@@ -137,6 +141,20 @@ class SessionManager:
 
     def clear_history(self) -> None:
         self.history.clear()
+
+    def start_new_session(self, title: str | None = None) -> dict[str, Any]:
+        """Reset transcript history and advance to a new translation session."""
+        self.history.clear()
+        self.session_number += 1
+        self.session_id = f"session_{int(time.time())}"
+        self.session_title = title.strip() if title and title.strip() else f"Speech Session #{self.session_number}"
+        self.session_start_time = time.time()
+        return {
+            "session_id": self.session_id,
+            "session_number": self.session_number,
+            "session_title": self.session_title,
+            "session_start_time": self.session_start_time,
+        }
 
 
 # Application singletons
@@ -253,6 +271,10 @@ async def health_check():
     }
 
 
+class NewSessionPayload(BaseModel):
+    title: str | None = None
+
+
 @app.get("/api/config")
 async def get_config():
     """Return public application configuration."""
@@ -265,6 +287,9 @@ async def get_config():
         "target_language": settings.target_language,
         "wedding": settings.wedding.model_dump(),
         "google_oauth_client_id": settings.google_oauth_client_id,
+        "session_id": session_manager.session_id,
+        "session_number": session_manager.session_number,
+        "session_title": session_manager.session_title,
     }
 
 
@@ -284,6 +309,7 @@ async def export_transcript(format: str = "markdown"):
     lines = [
         f"# Wedding Speech Transcript: {settings.wedding.bride_name} & {settings.wedding.groom_name}",
         f"**Date**: {time.strftime('%Y-%m-%d %H:%M:%S')}",
+        f"**Session**: #{session_manager.session_number} ({session_manager.session_title})",
         f"**Engine**: Gemini 3.8 Live 1-Step Real-Time Speech Translation ({settings.live_model})",
         "",
         "---",
@@ -310,6 +336,21 @@ async def clear_transcript():
     return {"status": "cleared"}
 
 
+@app.post("/api/session/new")
+async def create_new_session(payload: NewSessionPayload | None = None):
+    """Start a new translation session, clearing transcript and broadcasting new session info."""
+    title = payload.title if payload else None
+    session_info = session_manager.start_new_session(title=title)
+    await hub.broadcast(
+        {
+            "type": "new_session",
+            **session_info,
+            "timestamp": time.strftime("%H:%M:%S"),
+        }
+    )
+    return {"status": "ok", **session_info}
+
+
 @app.websocket("/ws/subtitles")
 async def websocket_subtitles(websocket: WebSocket):
     """Audience WebSocket feed for projector, console, and mobile guests."""
@@ -326,6 +367,9 @@ async def websocket_subtitles(websocket: WebSocket):
                     "source_language": settings.source_language_description,
                     "target_language": settings.target_language,
                     "wedding": settings.wedding.model_dump(),
+                    "session_id": session_manager.session_id,
+                    "session_number": session_manager.session_number,
+                    "session_title": session_manager.session_title,
                 },
                 ensure_ascii=False,
             )

@@ -13,6 +13,13 @@ export interface WeddingContextData {
   custom_notes: string;
 }
 
+export interface TranslationSessionInfo {
+  session_id: string;
+  session_number: number;
+  session_title: string;
+  timestamp?: string;
+}
+
 export interface BackendConfig {
   project_id: string;
   location: string;
@@ -22,6 +29,9 @@ export interface BackendConfig {
   target_language: string;
   wedding: WeddingContextData;
   google_oauth_client_id: string | null;
+  session_id?: string;
+  session_number?: number;
+  session_title?: string;
 }
 
 export type ViewMode = 'projector' | 'speaker' | 'mobile';
@@ -31,7 +41,17 @@ export type SubtitleLayoutMode = 'stacked' | 'side-by-side' | 'english';
 export type SubtitleFontStyle = 'serif' | 'sans';
 
 export interface LiveEvent {
-  type: 'init' | 'partial' | 'interim' | 'final' | 'interrupted' | 'transcript_cleared' | 'audio_level' | 'session_status' | 'error';
+  type:
+    | 'init'
+    | 'partial'
+    | 'interim'
+    | 'final'
+    | 'interrupted'
+    | 'transcript_cleared'
+    | 'new_session'
+    | 'audio_level'
+    | 'session_status'
+    | 'error';
   id?: number;
   chinese?: string;
   english?: string;
@@ -45,4 +65,7 @@ export interface LiveEvent {
   source_language?: string;
   target_language?: string;
   error?: string;
+  session_id?: string;
+  session_number?: number;
+  session_title?: string;
 }
