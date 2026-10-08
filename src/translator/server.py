@@ -18,7 +18,7 @@ from google.oauth2 import id_token as google_id_token
 from pydantic import BaseModel
 
 from translator.config import ROOT, settings
-from translator.live_translate import GeminiLiveTranslator, LiveEvent
+from translator.live_translate import DRAIN_SECONDS, GeminiLiveTranslator, LiveEvent
 
 logger = logging.getLogger("wedding_translator.server")
 
@@ -145,6 +145,10 @@ class SessionManager:
 
     def add_record(self, record: SubtitleRecord) -> None:
         self.history.append(record)
+
+    def next_subtitle_id(self) -> int:
+        """Id for the next subtitle, continuing after the transcript so far."""
+        return max((r.id for r in self.history), default=0) + 1
 
     def clear_history(self) -> None:
         self.history.clear()
@@ -432,9 +436,8 @@ async def websocket_speaker(websocket: WebSocket):
 
     logger.info("Speaker audio WebSocket accepted for %s", verified_email)
 
-    audio_queue: asyncio.Queue[bytes] = asyncio.Queue()
-    text_queue: asyncio.Queue[str] = asyncio.Queue()
-    control_queue: asyncio.Queue[str] = asyncio.Queue()
+    # None marks the end of speech (mic stopped or speaker disconnected).
+    audio_queue: asyncio.Queue[bytes | None] = asyncio.Queue()
     try:
         translator = GeminiLiveTranslator()
     except Exception:
@@ -444,9 +447,6 @@ async def websocket_speaker(websocket: WebSocket):
         await websocket.close(code=1011, reason="Translation backend is misconfigured")
         return
 
-    async def audio_interrupt_callback() -> None:
-        await hub.broadcast({"type": "interrupted"})
-
     last_rms_time = 0.0
 
     async def receive_from_client() -> None:
@@ -454,8 +454,7 @@ async def websocket_speaker(websocket: WebSocket):
         try:
             while True:
                 message = await websocket.receive()
-                msg_type = message.get("type")
-                if msg_type == "websocket.disconnect":
+                if message.get("type") == "websocket.disconnect":
                     break
 
                 if pcm_data := message.get("bytes"):
@@ -469,48 +468,12 @@ async def websocket_speaker(websocket: WebSocket):
 
                 elif text := message.get("text"):
                     try:
-                        parsed = json.loads(text)
-                        if isinstance(parsed, dict):
-                            msg_t = parsed.get("type")
-                            if msg_t in ("stream_end", "client_silence", "turn_end"):
-                                logger.info(
-                                    "Received Hybrid VAD control signal: %s", msg_t
-                                )
-                                await control_queue.put("stream_end")
-                                continue
-                            elif msg_t == "client_interim":
-                                interim_zh = str(parsed.get("text", "")).strip()
-                                if interim_zh:
-                                    translator.current_chinese = interim_zh
-                                    await hub.broadcast(
-                                        {
-                                            "type": "partial",
-                                            "chinese": interim_zh,
-                                            "english": getattr(
-                                                translator, "current_english", ""
-                                            ),
-                                            "is_interim": True,
-                                        }
-                                    )
-                                continue
-                            elif msg_t == "client_final":
-                                final_zh = str(parsed.get("text", "")).strip()
-                                if final_zh:
-                                    translator.current_chinese = final_zh
-                                    await hub.broadcast(
-                                        {
-                                            "type": "partial",
-                                            "chinese": final_zh,
-                                            "english": getattr(
-                                                translator, "current_english", ""
-                                            ),
-                                            "is_interim": False,
-                                        }
-                                    )
-                                continue
-                    except Exception as exc:
-                        logger.debug("Failed parsing client JSON message: %s", exc)
-                    await text_queue.put(text)
+                        msg_type = json.loads(text).get("type")
+                    except (ValueError, AttributeError):
+                        msg_type = None
+                    if msg_type == "stream_end":
+                        logger.info("Received stream_end from speaker client")
+                        break
         except (WebSocketDisconnect, asyncio.CancelledError):
             pass
         except Exception as exc:
@@ -520,12 +483,9 @@ async def websocket_speaker(websocket: WebSocket):
         try:
             async for event in translator.start_session(
                 audio_input_queue=audio_queue,
-                text_input_queue=text_queue,
-                control_queue=control_queue,
-                audio_interrupt_callback=audio_interrupt_callback,
+                first_subtitle_id=session_manager.next_subtitle_id(),
             ):
-                if event:
-                    await handle_live_event(event)
+                await handle_live_event(event)
         except (asyncio.CancelledError, GeneratorExit):
             pass
         except Exception:
@@ -539,6 +499,10 @@ async def websocket_speaker(websocket: WebSocket):
             [receive_task, translator_task],
             return_when=asyncio.FIRST_COMPLETED,
         )
+        if receive_task in done:
+            # Speech ended: let the translation of the last words arrive before closing.
+            await audio_queue.put(None)
+            await asyncio.wait({translator_task}, timeout=DRAIN_SECONDS + 2.0)
         for completed_task in done:
             name = (
                 "client_audio_input"

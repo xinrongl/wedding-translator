@@ -39,7 +39,7 @@ build: .frontend-build ## Build React frontend into src/app/dist for production 
 ##@ Development
 app-up: .app-down ## Start both backend (port 8000) and frontend (port 5173) services
 	@bash -c '\
-		trap "fuser -k 8000/tcp 5173/tcp 2>/dev/null; kill 0" SIGINT SIGTERM EXIT; \
+		trap "lsof -ti tcp:8000,5173 -sTCP:LISTEN | xargs kill 2>/dev/null; kill 0" SIGINT SIGTERM EXIT; \
 		$(UV) python -m translator.main & \
 		npm --prefix src/app run dev & \
 		wait'
@@ -47,7 +47,7 @@ app-up: .app-down ## Start both backend (port 8000) and frontend (port 5173) ser
 app-down: .app-down ## Stop both backend and frontend processes (ports 8000 & 5173)
 
 .app-down:
-	@fuser -k 8000/tcp 5173/tcp 2>/dev/null || true
+	@lsof -ti tcp:8000,5173 -sTCP:LISTEN | xargs kill 2>/dev/null || true
 	@echo "App stopped."
 
 docker-up: ## Build and start containerized app using Docker Compose (port 8080)

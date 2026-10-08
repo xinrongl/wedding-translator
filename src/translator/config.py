@@ -1,7 +1,6 @@
 """Configuration models and environment settings for the Wedding Translator."""
 
 from pathlib import Path
-from typing import Literal
 
 from pydantic import BaseModel, Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -61,88 +60,6 @@ class WeddingContext(BaseSettings):
         default="",
         description="Special names, family terms, or tone instructions",
     )
-    custom_vocabulary: str = Field(
-        default="",
-        description="Comma-separated custom vocabulary words for speech recognition biasing",
-    )
-
-    def get_vocabulary_list(self) -> list[str]:
-        """Generate vocabulary biasing list for Chinese speech recognition and homophone disambiguation."""
-        vocab: list[str] = [
-            # Key wedding terms, blessings & roles
-            "百年好合",
-            "新婚快乐",
-            "新郎",
-            "新娘",
-            "伴郎",
-            "伴娘",
-            "司仪",
-            "各位来宾",
-            "亲朋好友",
-            "致辞",
-            "干杯",
-            "Cheers",
-        ]
-
-        if self.bride_name:
-            for item in self.bride_name.replace(",", " ").split():
-                clean = item.strip()
-                if clean and clean not in vocab:
-                    vocab.append(clean)
-        if self.groom_name:
-            for item in self.groom_name.replace(",", " ").split():
-                clean = item.strip()
-                if clean and clean not in vocab:
-                    vocab.append(clean)
-        if self.venue:
-            for loc in [
-                self.venue,
-                "Stones of the Yarra Valley",
-                "Yarra Valley",
-                "Coldstream",
-                "雅拉河谷",
-            ]:
-                if loc not in vocab:
-                    vocab.append(loc)
-        if self.speaker_role and self.speaker_role not in vocab:
-            vocab.append(self.speaker_role)
-        if self.custom_vocabulary:
-            for item in self.custom_vocabulary.split(","):
-                clean = item.strip()
-                if clean and clean not in vocab:
-                    vocab.append(clean)
-        return vocab
-
-
-def build_wedding_translation_instruction(ctx: WeddingContext | None = None) -> str:
-    """Build system instruction for Gemini 3.8 Live 1-step real-time speech translation."""
-    c = ctx or WeddingContext()
-    context_lines = [
-        f"- Groom: {c.groom_name} (Chinese: 欣荣 / 林欣荣)",
-        f"- Bride: {c.bride_name} (Chinese: 顺顺 / 赵雪)",
-        f"- Venue: {c.venue}",
-    ]
-    if c.speaker_role:
-        context_lines.append(f"- Speaker Role: {c.speaker_role}")
-    if c.custom_notes:
-        context_lines.append(f"- Special Notes & Tone: {c.custom_notes}")
-
-    instructions = [
-        "You are an expert real-time simultaneous speech-to-English subtitle translator for a wedding ceremony.",
-        "Your mission: Listen to the incoming speech and immediately translate what is spoken into natural, fluent English subtitles in real-time.",
-        "",
-        "CRITICAL GROUNDING & ZERO-HALLUCINATION RULES:",
-        "1. TRANSLATE ONLY WHAT IS SPOKEN: Translate strictly and faithfully what the speaker literally says. Do NOT invent, assume, or extrapolate words that were not spoken.",
-        "2. NEVER HALLUCINATE CANNED SPEECHES: Under NO circumstances should you output generic ceremonial openings (such as 'Welcome everyone to this beautiful celebration of love' or 'Dear guests, welcome') unless the speaker explicitly utters those exact words.",
-        "3. CASUAL, TEST & OFF-HAND SPEECH: If the speaker asks questions, tests the microphone (e.g. 'mic check', 'can you hear me', '这个 translation 是不是有用的问题?'), makes a joke, or speaks off-topic, translate their exact meaning faithfully into English.",
-        "4. BILINGUAL CODE-SWITCHING: The speaker may mix English words (e.g., 'translation', 'love', 'cheers') into Chinese sentences. Transcribe and integrate the English naturally into the translated subtitle.",
-        "5. WEDDING CONTEXT & NAMES: When names, roles, or wedding blessings are genuinely spoken, translate them accurately and gracefully according to this context:",
-        "\n".join(context_lines),
-        "6. SUBTITLE FORMAT: Output ONLY English text subtitles. Stream translations with minimal latency, like Google Translate Live. Never output Chinese characters, pinyin, timestamps, quotation marks, or conversational responses.",
-        "7. CLAUSE-BY-CLAUSE EAGER TRANSLATION: Do not wait for a full long paragraph or speech to finish. Translate each spoken clause, thought, or phrase eagerly and continuously as the speaker talks.",
-    ]
-
-    return "\n".join(instructions)
 
 
 class Settings(BaseSettings):
@@ -171,9 +88,9 @@ class Settings(BaseSettings):
         description="Google Cloud Run deployment region (Melbourne)",
     )
     google_cloud_location: str = Field(
-        default="us-central1",
+        default="global",
         alias="GOOGLE_CLOUD_LOCATION",
-        description="Vertex AI region for Gemini Live (default: us-central1)",
+        description="Vertex AI location for Gemini Live (live-translate is served from 'global')",
     )
     gemini_api_key: str | None = Field(
         default=None,
@@ -235,11 +152,11 @@ class Settings(BaseSettings):
             if e.strip()
         }
 
-    # Gemini 3.8 Live 1-Step Model
+    # Dedicated simultaneous-translation Live model (listens while it translates)
     live_model: str = Field(
-        default="gemini-3.8-live",
+        default="gemini-3.5-live-translate-preview",
         alias="LIVE_MODEL",
-        description="Gemini 3.8 Live 1-step real-time streaming translation model",
+        description="Gemini Live model used for 1-step real-time streaming translation",
     )
 
     source_language_description: str = Field(
@@ -253,46 +170,15 @@ class Settings(BaseSettings):
         description="Target translation language code (BCP-47) - always English",
     )
 
-    # Speech-to-Text & Inference Tuning
-    stt_language_codes: str = Field(
-        default="zh-CN,en-US",
-        alias="STT_LANGUAGE_CODES",
-        description="Comma-separated BCP-47 language codes for speech recognition",
-    )
-    stt_mode: Literal["SMART", "VERBATIM"] = Field(
-        default="SMART",
-        alias="STT_MODE",
-        description="Speech recognition mode: SMART (neural cleanup) or VERBATIM",
-    )
-    temperature: float = Field(
-        default=0.0,
-        alias="TEMPERATURE",
-        description="Sampling temperature for translation determinism (0.0 = maximum acoustic grounding)",
-    )
     echo_target_language: bool = Field(
         default=True,
         alias="ECHO_TARGET_LANGUAGE",
         description="Whether to echo/parrot input speech already in the target language (e.g. English code-switching)",
     )
-    enable_context_compression: bool = Field(
-        default=True,
-        alias="ENABLE_CONTEXT_COMPRESSION",
-        description="Enable sliding-window context compression to remove the 15-minute uncompressed session limit",
-    )
-    enable_session_resumption: bool = Field(
-        default=True,
-        alias="ENABLE_SESSION_RESUMPTION",
-        description="Enable automatic session resumption tokens to survive socket drops",
-    )
     enable_audio_broadcast: bool = Field(
         default=False,
         alias="ENABLE_AUDIO_BROADCAST",
         description="Whether to broadcast translated 24kHz synthesized audio frames to audience subscribers",
-    )
-    vad_silence_duration_ms: int = Field(
-        default=200,
-        alias="VAD_SILENCE_DURATION_MS",
-        description="Voice activity detection silence threshold in milliseconds for snappy turn detection",
     )
 
     # Wedding Context
