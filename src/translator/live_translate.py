@@ -2,17 +2,19 @@
 
 Follows Google's reference client (google-gemini/gemini-live-api-examples,
 command-line/python/translate.py): the session is a continuous interpreter, not a
-turn-based assistant. 100 ms PCM chunks go in; the source transcript and the
-translated transcript stream out. The only app logic on top is pairing the two
-transcripts into sentence subtitles (SubtitleSegmenter).
+turn-based assistant. 100 ms PCM chunks go in; the source transcript, the
+translated transcript and translated audio stream out.
+
+On top of that, the app cuts the Chinese transcript into short subtitles
+(SubtitleSegmenter) and, once each is complete, replaces the Live model's
+on-the-fly English with a context-aware text translation (TranslationRefiner).
 """
 
 import asyncio
 import base64
 import logging
-import re
 import time
-from collections.abc import AsyncGenerator
+from collections.abc import AsyncGenerator, Awaitable, Callable
 from typing import Any, NotRequired, TypedDict
 
 from google import genai
@@ -31,12 +33,20 @@ OUTPUT_SAMPLE_RATE = 24000
 # 100 ms of 16-bit mono PCM, the chunk size the Live Translate docs recommend.
 CHUNK_BYTES = INPUT_SAMPLE_RATE // 10 * 2
 
-ENGLISH_SENTENCE_END = re.compile(r"[.!?]+[\"')\]]*(?=\s|$)")
 CHINESE_SENTENCE_ENDINGS = "。！？!?"
-# English finished a sentence but its Chinese never reached a sentence end: commit anyway.
-PAIRING_TIMEOUT_SECONDS = 1.5
-# Speaker paused mid-sentence: commit whatever has been translated.
+CHINESE_CLAUSE_BREAKS = "，,；;"
+# A comma ends a subtitle only once it holds this many characters (~4 s of speech).
+MIN_CLAUSE_CHARS = 18
+# Speaker paused mid-clause: commit what has been transcribed.
 SILENCE_FLUSH_SECONDS = 2.5
+# Previous subtitles the text model sees, so a clause reads on from the last one.
+REFINE_CONTEXT_SUBTITLES = 4
+# Requests occasionally stall for 10 s+; every this many seconds another one is raced.
+REFINE_STAGGER_SECONDS = 2.0
+# The second raced request goes to another model.
+REFINE_BACKUP_MODEL = "gemini-3.8-flash"
+# Past this the subtitle keeps the Live model's English.
+REFINE_TIMEOUT_SECONDS = 8.0
 # After the mic stops, how long the trailing translation is given to arrive.
 DRAIN_SECONDS = 3.0
 # A session the server closes sooner than this is treated as a failure, not rotation.
@@ -111,80 +121,61 @@ def build_live_connect_config(target_language_code: str) -> types.LiveConnectCon
 
 
 class SubtitleSegmenter:
-    """Pairs the streamed Chinese transcript with its English translation, one subtitle per sentence.
+    """Cuts the streamed Chinese transcript into short subtitles.
 
-    Both transcripts stream continuously and either one can run ahead of the other
-    (the Chinese "…睡" / "觉。" can arrive after the English "…in the library."). A
-    subtitle is therefore committed only once the English has finished a sentence
-    *and* the Chinese has reached a sentence end; the Chinese is cut after as many
-    sentence ends as the English contains, and the rest carries to the next subtitle.
+    The Chinese transcript is what the subtitles are built on: a subtitle ends at a
+    sentence end, or at a comma once it is long enough to read (the model often
+    chains a whole paragraph with commas). The live English rides along as a draft
+    that TranslationRefiner later replaces; it lags the Chinese, so it is never used
+    to decide where a subtitle ends.
     """
 
     def __init__(self, first_id: int = 1) -> None:
         self.next_id = first_id
         self.chinese = ""
         self.english = ""
-        self.english_done_at: float | None = None
-        self.last_activity = 0.0
+        self.last_chinese_at = 0.0
 
     def add_chinese(self, text: str, now: float) -> list[LiveEvent]:
         self.chinese += text
-        self.last_activity = now
-        return [self._partial(), *self._commit_if_paired()]
+        self.last_chinese_at = now
+        events: list[LiveEvent] = []
+        while (cut := self._clause_end()) is not None:
+            events.append(self._commit(cut))
+        return [*events, self._partial()]
 
     def add_english(self, text: str, now: float) -> list[LiveEvent]:
         self.english += text
-        self.last_activity = now
-        if self.english_done_at is None and ENGLISH_SENTENCE_END.search(self.english):
-            self.english_done_at = now
-        return [self._partial(), *self._commit_if_paired()]
+        return [self._partial()]
 
     def tick(self, now: float) -> list[LiveEvent]:
-        """Commit on timeouts: finished English whose Chinese never paired, or a pause mid-sentence."""
-        if not self.english.strip():
+        """Commit a half-finished clause once the speaker pauses."""
+        if now - self.last_chinese_at < SILENCE_FLUSH_SECONDS:
             return []
-        if now - self.last_activity >= SILENCE_FLUSH_SECONDS:
-            return [self._commit(whole=True)]
-        if (
-            self.english_done_at is not None
-            and now - self.english_done_at >= PAIRING_TIMEOUT_SECONDS
-        ):
-            return [self._commit()]
+        if self.chinese.strip():
+            return [self._commit(len(self.chinese))]
+        # Draft English that trailed the last subtitle: drop it, not carry it forward.
+        self.english = ""
         return []
 
     def flush(self) -> list[LiveEvent]:
-        """Commit everything pending (stream ended)."""
-        if not (self.english.strip() or self.chinese.strip()):
+        """Commit the unfinished clause (stream ended); trailing draft English alone is dropped."""
+        if not self.chinese.strip():
+            self.english = ""
             return []
-        return [self._commit(whole=True)]
+        return [self._commit(len(self.chinese))]
 
-    def _commit_if_paired(self) -> list[LiveEvent]:
-        if self.english_done_at is not None and self._chinese_sentence_ends():
-            return [self._commit()]
-        return []
+    def _clause_end(self) -> int | None:
+        for i, ch in enumerate(self.chinese):
+            if ch in CHINESE_SENTENCE_ENDINGS or (
+                ch in CHINESE_CLAUSE_BREAKS and i + 1 >= MIN_CLAUSE_CHARS
+            ):
+                return i + 1
+        return None
 
-    def _chinese_sentence_ends(self) -> list[int]:
-        return [
-            i for i, ch in enumerate(self.chinese) if ch in CHINESE_SENTENCE_ENDINGS
-        ]
-
-    def _commit(self, whole: bool = False) -> LiveEvent:
-        """Commit up to the last English sentence end (or everything when whole=True)."""
-        sentence_ends = list(ENGLISH_SENTENCE_END.finditer(self.english))
-        if sentence_ends and not whole:
-            cut = sentence_ends[-1].end()
-            english, self.english = self.english[:cut], self.english[cut:]
-        else:
-            english, self.english = self.english, ""
-
-        chinese_ends = self._chinese_sentence_ends()
-        if sentence_ends and chinese_ends and not whole:
-            n = min(len(sentence_ends), len(chinese_ends))
-            cut = chinese_ends[n - 1] + 1
-            chinese, self.chinese = self.chinese[:cut], self.chinese[cut:]
-        else:
-            chinese, self.chinese = self.chinese, ""
-
+    def _commit(self, cut: int) -> LiveEvent:
+        chinese, self.chinese = self.chinese[:cut], self.chinese[cut:]
+        english, self.english = self.english, ""
         event: LiveEvent = {
             "type": "final",
             "id": self.next_id,
@@ -192,14 +183,7 @@ class SubtitleSegmenter:
             "english": english.strip(),
             "timestamp": time.strftime("%H:%M:%S"),
         }
-        logger.info(
-            "Subtitle #%d: [ZH] %s -> [EN] %s",
-            event["id"],
-            event["chinese"],
-            event["english"],
-        )
         self.next_id += 1
-        self.english_done_at = None
         return event
 
     def _partial(self) -> LiveEvent:
@@ -209,6 +193,109 @@ class SubtitleSegmenter:
             "chinese": self.chinese.strip(),
             "english": self.english.strip(),
         }
+
+
+class TranslationRefiner:
+    """Re-translates each finished Chinese subtitle with a text model.
+
+    The Live model interprets on the fly: it commits to English before the Chinese
+    sentence is over and only knows the names it hears. Once a clause is complete,
+    a text model given the preceding subtitles and the wedding's names turns it into
+    English that reads as one continuous speech.
+    """
+
+    def __init__(self, client: genai.Client, model: str) -> None:
+        self.client = client
+        self.model = model
+        self.history: list[tuple[str, str]] = []
+        wedding = settings.wedding
+        self.context = (
+            "Live English subtitles for a wedding speech given in Mandarin Chinese, sometimes "
+            f"mixed with English. The bride is {wedding.bride_name}, the groom is "
+            f"{wedding.groom_name}, the venue is {wedding.venue}."
+            + (f" Speaker: {wedding.speaker_role}." if wedding.speaker_role else "")
+            + (f" {wedding.custom_notes}" if wedding.custom_notes else "")
+            + " The Chinese is an automatic speech transcript, so names and words may be "
+            "misheard as similar-sounding ones (新郎 'groom' as 星朗, the couple's names as "
+            "other characters); translate what the speaker meant."
+        )
+
+    async def refine(self, chinese: str, draft: str) -> str | None:
+        """English for the subtitle, or None if the text model did not answer in time."""
+        if not chinese:
+            return None
+        previous = "\n".join(
+            f"Chinese: {zh}\nEnglish: {en}"
+            for zh, en in self.history[-REFINE_CONTEXT_SUBTITLES:]
+        )
+        prompt = (
+            f"{self.context}\n\nPrevious subtitles:\n{previous or '(start of speech)'}\n\n"
+            "Translate only the next subtitle into natural English. It may be part of a longer "
+            "sentence; continue smoothly from the previous subtitle. Output only the English.\n\n"
+            f"Chinese: {chinese}"
+        )
+        english = await self._generate_hedged(prompt)
+        self.history.append((chinese, english or draft))
+        return english
+
+    async def _generate_hedged(self, prompt: str) -> str | None:
+        """Race staggered requests and take the first answer.
+
+        Text models occasionally stall for 10 s or more; a request started a couple of
+        seconds later (first on a second model) almost always answers before it.
+        """
+        attempts = [
+            (0.0, self.model, types.ThinkingConfig(thinking_budget=0)),
+            (
+                REFINE_STAGGER_SECONDS,
+                REFINE_BACKUP_MODEL,
+                types.ThinkingConfig(thinking_level="low"),
+            ),
+            (
+                2 * REFINE_STAGGER_SECONDS,
+                self.model,
+                types.ThinkingConfig(thinking_budget=0),
+            ),
+        ]
+        pending: set[asyncio.Task[str]] = set()
+        started = time.monotonic()
+        try:
+            while (elapsed := time.monotonic() - started) < REFINE_TIMEOUT_SECONDS:
+                while attempts and attempts[0][0] <= elapsed:
+                    _, model, thinking = attempts.pop(0)
+                    pending.add(
+                        asyncio.create_task(self._generate(prompt, model, thinking))
+                    )
+                if not pending:
+                    if not attempts:
+                        break
+                    await asyncio.sleep(attempts[0][0] - elapsed)
+                    continue
+                next_at = attempts[0][0] if attempts else REFINE_TIMEOUT_SECONDS
+                done, pending = await asyncio.wait(
+                    pending,
+                    timeout=next_at - elapsed,
+                    return_when=asyncio.FIRST_COMPLETED,
+                )
+                for task in done:
+                    if task.exception() is None and task.result():
+                        return task.result()
+                    logger.warning("Refinement request failed: %s", task.exception())
+            logger.warning("Refinement gave no answer; keeping the live translation")
+            return None
+        finally:
+            for task in pending:
+                task.cancel()
+
+    async def _generate(
+        self, prompt: str, model: str, thinking: types.ThinkingConfig
+    ) -> str:
+        response = await self.client.aio.models.generate_content(
+            model=model,
+            contents=prompt,
+            config=types.GenerateContentConfig(temperature=0, thinking_config=thinking),
+        )
+        return (response.text or "").strip()
 
 
 class GeminiLiveTranslator:
@@ -235,6 +322,7 @@ class GeminiLiveTranslator:
         self.location = location or settings.google_cloud_location
         self.api_key = api_key or settings.gemini_api_key
         self.use_vertex = settings.use_vertex if use_vertex is None else use_vertex
+        self.refine_model = settings.refine_model
 
         self.client = create_genai_client(
             use_vertex=self.use_vertex,
@@ -276,6 +364,19 @@ class GeminiLiveTranslator:
     ) -> None:
         segmenter = SubtitleSegmenter(first_subtitle_id)
         config = build_live_connect_config(self.target_language_code)
+        to_refine: asyncio.Queue[LiveEvent | None] = asyncio.Queue()
+        refiner = asyncio.create_task(self._refine_subtitles(to_refine, events))
+
+        async def publish(event: LiveEvent) -> None:
+            if event["type"] != "final" or not self.refine_model:
+                await events.put(event)
+                return
+            # The live English lags the Chinese, so at the cut it mostly belongs to the
+            # previous clause: show the Chinese now and the English once refined.
+            logger.info("Subtitle #%d: [ZH] %s", event["id"], event["chinese"])
+            await events.put({**event, "english": ""})
+            await to_refine.put(event)
+
         try:
             mic_open = True
             while mic_open:
@@ -296,38 +397,58 @@ class GeminiLiveTranslator:
                         }
                     )
                     mic_open = await self._stream(
-                        session, audio_queue, segmenter, events
+                        session, audio_queue, segmenter, publish
                     )
                 # The server ended the session (time limit or GoAway) while the speaker is
                 # still talking: start a fresh one. Pending text belongs to the old session.
                 for event in segmenter.flush():
-                    await events.put(event)
+                    await publish(event)
                 if mic_open:
                     logger.info("Gemini Live session ended; reconnecting")
         except asyncio.CancelledError:
+            refiner.cancel()
             raise
         except Exception as exc:
             logger.exception("Gemini Live session failure")
             for event in segmenter.flush():
-                await events.put(event)
-            await events.put(
-                {
-                    "type": "error",
-                    "error": str(exc),
-                    "timestamp": time.strftime("%H:%M:%S"),
-                }
-            )
+                await publish(event)
+            status: LiveEvent = {
+                "type": "error",
+                "error": str(exc),
+                "timestamp": time.strftime("%H:%M:%S"),
+            }
         else:
-            await events.put({"type": "session_status", "status": "disconnected"})
+            status = {"type": "session_status", "status": "disconnected"}
         finally:
-            await events.put(None)
+            # Let the last subtitles finish refining before the session closes.
+            await to_refine.put(None)
+            await asyncio.gather(refiner, return_exceptions=True)
+        await events.put(status)
+        await events.put(None)
+
+    async def _refine_subtitles(
+        self,
+        to_refine: asyncio.Queue[LiveEvent | None],
+        events: asyncio.Queue[LiveEvent | None],
+    ) -> None:
+        """Fill in each subtitle's English from the text model, in order.
+
+        Falls back to the Live model's English when the text model fails.
+        """
+        refiner = TranslationRefiner(self.client, self.refine_model)
+        while (subtitle := await to_refine.get()) is not None:
+            english = await refiner.refine(subtitle["chinese"], subtitle["english"])
+            english = english or subtitle["english"]
+            logger.info("Subtitle #%d: [EN] %s", subtitle["id"], english)
+            if english:
+                await events.put({**subtitle, "english": english})
 
     async def _stream(
         self,
         session: Any,
         audio_queue: asyncio.Queue[bytes | None],
         segmenter: SubtitleSegmenter,
-        events: asyncio.Queue[LiveEvent | None],
+        publish: Callable[[LiveEvent], Awaitable[None]],
     ) -> bool:
         """Run one Live session. Returns True if the server ended it, False if the mic stopped."""
         started = time.monotonic()
@@ -355,13 +476,13 @@ class GeminiLiveTranslator:
                         )
                         return
                     for event in self._handle_message(message, segmenter):
-                        await events.put(event)
+                        await publish(event)
 
         async def tick() -> None:
             while True:
                 await asyncio.sleep(0.25)
                 for event in segmenter.tick(time.monotonic()):
-                    await events.put(event)
+                    await publish(event)
 
         sender = asyncio.create_task(send_audio())
         receiver = asyncio.create_task(receive())

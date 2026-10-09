@@ -14,10 +14,10 @@ from translator.config import (
 )
 from translator.live_translate import (
     CHUNK_BYTES,
-    PAIRING_TIMEOUT_SECONDS,
     SILENCE_FLUSH_SECONDS,
     GeminiLiveTranslator,
     SubtitleSegmenter,
+    TranslationRefiner,
     build_live_connect_config,
     create_translator,
 )
@@ -313,64 +313,116 @@ def _commits(events):
     return [(e["chinese"], e["english"]) for e in events if e["type"] == "final"]
 
 
-def test_segmenter_waits_for_chinese_that_lags_its_english():
-    """English 'library.' arrives before the Chinese '觉。': the pair must still line up."""
+def test_segmenter_cuts_at_sentence_ends_and_at_commas_in_long_clauses():
+    """A sentence end always cuts; a comma cuts only once the subtitle is long enough to read."""
     seg = SubtitleSegmenter()
-    out = seg.add_chinese("第一次见到他的时候,他正在图书馆里睡", 0.0)
-    out += seg.add_english(
-        "The first time I saw him, he was sleeping in the library.", 0.3
-    )
+    out = seg.add_chinese("大家好,", 0.0)
     assert _commits(out) == []
-    out += seg.add_chinese("觉。后来我们", 0.5)
-    out += seg.add_english(" Later, we rented", 0.8)
+    out = seg.add_chinese(
+        "我是新郎的表哥。说实话,我从小看着他长大,他小时候特别调皮,上树", 0.5
+    )
     assert _commits(out) == [
-        (
-            "第一次见到他的时候,他正在图书馆里睡觉。",
-            "The first time I saw him, he was sleeping in the library.",
-        )
+        ("大家好,我是新郎的表哥。", ""),
+        ("说实话,我从小看着他长大,他小时候特别调皮,", ""),
     ]
-    assert seg.chinese == "后来我们"
-    assert seg.english.strip() == "Later, we rented"
+    assert seg.chinese == "上树"
+    assert out[-1] == {"type": "partial", "id": 3, "chinese": "上树", "english": ""}
 
 
-def test_segmenter_carries_english_after_a_mid_chunk_sentence_end():
-    """A chunk like 'girl. He said' commits up to the period and keeps the rest."""
+def test_segmenter_live_english_is_a_draft_on_the_open_subtitle():
+    """The lagging live English shows on the open subtitle and goes with it at the cut."""
     seg = SubtitleSegmenter()
-    seg.add_chinese("三年前,他遇到了一个女孩。他说", 0.0)
-    out = seg.add_english("Three years ago, he met a girl. He said", 0.2)
-    assert _commits(out) == [
-        ("三年前,他遇到了一个女孩。", "Three years ago, he met a girl.")
+    seg.add_chinese("他紧张得", 0.0)
+    out = seg.add_english("He was so nervous", 0.2)
+    assert out == [
+        {
+            "type": "partial",
+            "id": 1,
+            "chinese": "他紧张得",
+            "english": "He was so nervous",
+        }
     ]
-    assert (seg.chinese, seg.english.strip()) == ("他说", "He said")
+    out = seg.add_chinese("连戒指都差点掉了。", 0.4)
+    assert _commits(out) == [("他紧张得连戒指都差点掉了。", "He was so nervous")]
+    assert seg.english == ""
 
 
-def test_segmenter_pairs_two_chinese_sentences_with_two_english_ones():
-    """When the English finishes two sentences at once, both Chinese sentences go with it."""
+def test_segmenter_flushes_on_silence_and_drops_trailing_draft():
     seg = SubtitleSegmenter()
-    seg.add_chinese("那个女孩就是新娘。我记得", 0.0)
-    out = seg.add_english("That girl is the bride. I remember the movie.", 0.2)
-    assert _commits(out) == [
-        ("那个女孩就是新娘。", "That girl is the bride. I remember the movie.")
-    ]
-
-
-def test_segmenter_timeouts():
-    """Unpaired finished English commits after the pairing timeout; a mid-sentence pause after the silence timeout."""
-    seg = SubtitleSegmenter()
-    seg.add_chinese("三年前,他遇到了一个女孩,", 0.0)
-    seg.add_english("Three years ago, he met a girl.", 0.1)
-    assert seg.tick(0.1 + PAIRING_TIMEOUT_SECONDS / 2) == []
-    assert _commits(seg.tick(0.1 + PAIRING_TIMEOUT_SECONDS)) == [
-        ("三年前,他遇到了一个女孩,", "Three years ago, he met a girl.")
-    ]
-
     seg.add_chinese("他紧张得", 10.0)
-    seg.add_english("He was so nervous", 10.2)
-    assert seg.tick(10.2 + SILENCE_FLUSH_SECONDS / 2) == []
-    assert _commits(seg.tick(10.2 + SILENCE_FLUSH_SECONDS)) == [
-        ("他紧张得", "He was so nervous")
-    ]
-    assert seg.tick(100.0) == []
+    assert seg.tick(10.0 + SILENCE_FLUSH_SECONDS / 2) == []
+    assert _commits(seg.tick(10.0 + SILENCE_FLUSH_SECONDS)) == [("他紧张得", "")]
+    # English of the last subtitle arriving after the cut is not carried forward.
+    seg.add_english("He was so nervous", 13.0)
+    assert seg.tick(20.0) == []
+    assert seg.english == ""
+    seg.add_english(" Cheers.", 21.0)
+    assert seg.flush() == []
+
+
+def _refiner(monkeypatch, generate):
+    monkeypatch.setattr(TranslationRefiner, "_generate", generate)
+    return TranslationRefiner(client=MagicMock(), model="primary")
+
+
+@pytest.mark.asyncio
+async def test_refiner_gives_context_and_names(monkeypatch):
+    prompts = []
+
+    async def generate(self, prompt, model, thinking):
+        prompts.append(prompt)
+        return f"EN{len(prompts)}"
+
+    refiner = _refiner(monkeypatch, generate)
+    assert await refiner.refine("大家好,", "draft") == "EN1"
+    assert await refiner.refine("我是新郎的表哥。", "") == "EN2"
+    assert settings.wedding.groom_name in prompts[0]
+    assert "Chinese: 大家好,\nEnglish: EN1" in prompts[1]
+    assert prompts[1].endswith("Chinese: 我是新郎的表哥。")
+    assert await refiner.refine("", "draft") is None
+
+
+@pytest.mark.asyncio
+async def test_refiner_races_a_backup_when_the_first_request_stalls(monkeypatch):
+    """A stalled request is raced by a later one (on the backup model) instead of timing out."""
+    monkeypatch.setattr("translator.live_translate.REFINE_TIMEOUT_SECONDS", 1.0)
+    calls = []
+
+    async def generate(self, prompt, model, thinking):
+        calls.append(model)
+        if model == "primary":
+            await asyncio.Event().wait()
+        return "Cheers!"
+
+    monkeypatch.setattr("translator.live_translate.REFINE_STAGGER_SECONDS", 0.05)
+    refiner = _refiner(monkeypatch, generate)
+    assert await refiner.refine("干杯。", "draft") == "Cheers!"
+    assert calls[0] == "primary" and calls[1] != "primary"
+
+
+@pytest.mark.asyncio
+async def test_refiner_gives_up_when_every_request_fails(monkeypatch):
+    async def generate(self, prompt, model, thinking):
+        raise RuntimeError("429 RESOURCE_EXHAUSTED")
+
+    monkeypatch.setattr("translator.live_translate.REFINE_TIMEOUT_SECONDS", 0.2)
+    monkeypatch.setattr("translator.live_translate.REFINE_STAGGER_SECONDS", 0.01)
+    refiner = _refiner(monkeypatch, generate)
+    assert await refiner.refine("干杯。", "Cheers.") is None
+    assert refiner.history == [("干杯。", "Cheers.")]
+
+
+async def _fake_refine(self, prompt, model, thinking):
+    return "EN(" + prompt.rsplit("Chinese: ", 1)[-1] + ")"
+
+
+def _subtitles(events):
+    """What each subtitle ends up showing: later finals for an id replace earlier ones."""
+    cards = {}
+    for e in events:
+        if e["type"] == "final":
+            cards[e["id"]] = (e["chinese"], e["english"])
+    return list(cards.values())
 
 
 def _message(input_text=None, output_text=None, text_part=None, go_away=None):
@@ -420,6 +472,7 @@ def _mock_session(messages):
 async def test_session_streams_100ms_chunks_and_drains_after_mic_stop(monkeypatch):
     """Audio is re-chunked to 100 ms, mic stop sends audio_stream_end, and the last subtitle is flushed."""
     monkeypatch.setattr("translator.live_translate.DRAIN_SECONDS", 0.05)
+    monkeypatch.setattr(TranslationRefiner, "_generate", _fake_refine)
     translator = GeminiLiveTranslator()
     session = _mock_session(
         [
@@ -442,9 +495,12 @@ async def test_session_streams_100ms_chunks_and_drains_after_mic_stop(monkeypatc
     sizes = [len(s["audio"].data) for s in sends if "audio" in s]
     assert sizes == [CHUNK_BYTES] * 3 + [10240 - 3 * CHUNK_BYTES]
     assert sends[-1] == {"audio_stream_end": True}
+    # Each subtitle appears with its Chinese first, then its refined English.
     assert _commits(events) == [
-        ("大家晚上好。", "Good evening, everyone."),
-        ("谢谢", "Thank you"),
+        ("大家晚上好。", ""),
+        ("大家晚上好。", "EN(大家晚上好。)"),
+        ("谢谢", ""),
+        ("谢谢", "EN(谢谢)"),
     ]
     assert events[0]["status"] == "connected"
     assert events[-1] == {"type": "session_status", "status": "disconnected"}
@@ -455,6 +511,7 @@ async def test_session_reconnects_fresh_after_go_away(monkeypatch):
     """A GoAway rotates to a new session instead of ending the speaker's stream."""
     monkeypatch.setattr("translator.live_translate.MIN_HEALTHY_SESSION_SECONDS", 0)
     monkeypatch.setattr("translator.live_translate.DRAIN_SECONDS", 0.05)
+    monkeypatch.setattr(TranslationRefiner, "_generate", _fake_refine)
     translator = GeminiLiveTranslator()
     first = _mock_session(
         [
@@ -488,7 +545,10 @@ async def test_session_reconnects_fresh_after_go_away(monkeypatch):
         "connected",
         "disconnected",
     ]
-    assert _commits(events) == [("大家好。", "Hello everyone."), ("干杯。", "Cheers.")]
+    assert _subtitles(events) == [
+        ("大家好。", "EN(大家好。)"),
+        ("干杯。", "EN(干杯。)"),
+    ]
 
 
 async def _collect(agen):
@@ -531,6 +591,7 @@ async def test_new_mic_session_continues_subtitle_ids(monkeypatch):
     for i in (1, 2):
         sm.add_record(SubtitleRecord(id=i, chinese="", english="", timestamp=""))
 
+    monkeypatch.setattr(TranslationRefiner, "_generate", _fake_refine)
     translator = GeminiLiveTranslator()
     session = _mock_session(
         [_message(input_text="干杯。"), _message(output_text="Cheers.")]
@@ -545,4 +606,28 @@ async def test_new_mic_session_continues_subtitle_ids(monkeypatch):
                 finals.append(event)
                 await audio.put(None)
 
-    assert [f["id"] for f in finals] == [3]
+    assert {f["id"] for f in finals} == {3}
+
+
+@pytest.mark.asyncio
+async def test_session_keeps_live_english_when_refinement_is_off(monkeypatch):
+    monkeypatch.setattr("translator.live_translate.DRAIN_SECONDS", 0.05)
+    translator = GeminiLiveTranslator()
+    translator.refine_model = ""
+    session = _mock_session(
+        [_message(input_text="他紧张得"), _message(output_text="He was so nervous")]
+    )
+    audio: asyncio.Queue[bytes | None] = asyncio.Queue()
+    await audio.put(None)
+    with patch.object(translator.client.aio.live, "connect", _mock_connect(session)):
+        events = [e async for e in translator.start_session(audio_input_queue=audio)]
+    assert _commits(events) == [("他紧张得", "He was so nervous")]
+
+
+def test_history_replaces_a_refined_subtitle():
+    sm = SessionManager()
+    sm.add_record(SubtitleRecord(id=1, chinese="干杯。", english="", timestamp=""))
+    sm.add_record(
+        SubtitleRecord(id=1, chinese="干杯。", english="Cheers!", timestamp="")
+    )
+    assert [(r.id, r.english) for r in sm.history] == [(1, "Cheers!")]

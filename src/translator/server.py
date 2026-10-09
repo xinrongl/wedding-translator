@@ -18,7 +18,12 @@ from google.oauth2 import id_token as google_id_token
 from pydantic import BaseModel
 
 from translator.config import ROOT, settings
-from translator.live_translate import DRAIN_SECONDS, GeminiLiveTranslator, LiveEvent
+from translator.live_translate import (
+    DRAIN_SECONDS,
+    REFINE_TIMEOUT_SECONDS,
+    GeminiLiveTranslator,
+    LiveEvent,
+)
 
 logger = logging.getLogger("wedding_translator.server")
 
@@ -144,6 +149,11 @@ class SessionManager:
             self.is_active = False
 
     def add_record(self, record: SubtitleRecord) -> None:
+        """Append a subtitle, or replace it when a refined version of the same id arrives."""
+        for i, existing in enumerate(self.history):
+            if existing.id == record.id:
+                self.history[i] = record
+                return
         self.history.append(record)
 
     def next_subtitle_id(self) -> int:
@@ -502,7 +512,9 @@ async def websocket_speaker(websocket: WebSocket):
         if receive_task in done:
             # Speech ended: let the translation of the last words arrive before closing.
             await audio_queue.put(None)
-            await asyncio.wait({translator_task}, timeout=DRAIN_SECONDS + 2.0)
+            await asyncio.wait(
+                {translator_task}, timeout=DRAIN_SECONDS + REFINE_TIMEOUT_SECONDS + 2.0
+            )
         for completed_task in done:
             name = (
                 "client_audio_input"

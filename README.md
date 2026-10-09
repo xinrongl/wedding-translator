@@ -6,6 +6,8 @@ It interprets spoken **Mandarin Chinese (Simplified)**—including natural **Eng
 
 Built on Google's **Gemini Live Translate** model (`gemini-3.5-live-translate-preview`) through the Google GenAI Python SDK (`google-genai`). The session setup follows Google's [Live Translate guide](https://ai.google.dev/gemini-api/docs/live-api/live-translate) and its reference client ([`translate.py`](https://github.com/google-gemini/gemini-live-api-examples/blob/main/command-line/python/translate.py)): no prompt, no vocabulary or VAD tuning, 100 ms audio chunks, and a fresh session whenever the server ends one.
 
+The Live model's own English is simultaneous interpretation: it commits before a Chinese sentence is over, chains sentences with commas, and only knows the names it hears. So the subtitles are built from its Chinese transcript instead. Each short clause is re-translated by a text model (`REFINE_MODEL`, default `gemini-3.5-flash` without thinking) that sees the previous subtitles and the couple's names. On a 3-minute test speech, a blind judge scored this 92–96/100, against 65/100 for the Live English. The English appears ~1.5 s after its Chinese.
+
 ---
 
 ## Architecture Overview
@@ -22,9 +24,10 @@ Built on Google's **Gemini Live Translate** model (`gemini-3.5-live-translate-pr
 |                                                                                 |
 |   Audio Ingestion Bridge                         Broadcast Hub                  |
 |   - Ingests 16kHz PCM, sends 100 ms chunks       - Pushes live English          |
-|   - Pairs Chinese + English transcripts            subtitles to Projector,      |
-|     into sentence subtitles                        Mobile, & Console Displays   |
-|     (SubtitleSegmenter)                            (/ws/subtitles)              |
+|   - Cuts the Chinese transcript into short         subtitles to Projector,      |
+|     subtitles (SubtitleSegmenter)                  Mobile, & Console Displays   |
+|   - Re-translates each with context + names        (/ws/subtitles)              |
+|     (TranslationRefiner, gemini-3.5-flash)                                      |
 +----------------------------------------+----------------------------------------+
                                          |
                          Bidirectional   |   Real-time Audio In

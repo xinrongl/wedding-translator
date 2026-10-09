@@ -175,6 +175,11 @@ class Settings(BaseSettings):
         alias="ECHO_TARGET_LANGUAGE",
         description="Whether to echo/parrot input speech already in the target language (e.g. English code-switching)",
     )
+    refine_model: str = Field(
+        default="gemini-3.5-flash",
+        alias="REFINE_MODEL",
+        description="Text model that re-translates each finished subtitle with context and the wedding's names (empty = show the Live model's English)",
+    )
     enable_audio_broadcast: bool = Field(
         default=False,
         alias="ENABLE_AUDIO_BROADCAST",

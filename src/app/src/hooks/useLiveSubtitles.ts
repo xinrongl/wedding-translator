@@ -130,7 +130,8 @@ export function useLiveSubtitles() {
             break;
 
           case 'final':
-            setActivePartial(null);
+            // A refined English for an earlier subtitle must not clear the one being spoken.
+            setActivePartial((prev) => (prev && data.id !== undefined && prev.id > data.id ? prev : null));
             if (data.chinese || data.english) {
               const newRecord: SubtitleItem = {
                 id: data.id ?? Date.now(),
