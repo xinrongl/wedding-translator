@@ -27,6 +27,7 @@ from translator.server import (
     SubtitleRecord,
     app,
     calculate_pcm_level,
+    pcm_dbfs,
     verify_speaker_identity,
 )
 
@@ -47,6 +48,19 @@ def test_calculate_pcm_level():
 
     loud = b"\xff\x7f" * 1600
     assert calculate_pcm_level(loud) > 50.0
+
+
+def test_level_meter_reads_normal_speech_on_a_db_scale():
+    """Speech around -20 dBFS fills two thirds of the meter instead of a 10% sliver."""
+    import math
+    import struct
+
+    amplitude = 32768 * 10 ** (-20 / 20)  # RMS of a constant signal = its amplitude
+    pcm = struct.pack("<1600h", *[int(amplitude)] * 1600)
+    rms_db, peak_db = pcm_dbfs(pcm)
+    assert math.isclose(rms_db, -20, abs_tol=0.1)
+    assert math.isclose(peak_db, -20, abs_tol=0.1)
+    assert 66 <= calculate_pcm_level(pcm) <= 67
 
 
 @pytest.mark.smoke

@@ -201,15 +201,33 @@ app.add_middleware(
 )
 
 
-def calculate_pcm_level(pcm_data: bytes) -> float:
-    """Calculate RMS energy level (0.0 to 100.0) from 16-bit linear PCM audio."""
-    if len(pcm_data) < 2:
-        return 0.0
+# Level meter range: -60 dBFS (a quiet room) reads 0, full scale reads 100, so normal
+# speech (-30 to -15 dBFS) fills half the bar or more.
+METER_FLOOR_DBFS = -60.0
+# How often the speaker's input level is logged, to diagnose a quiet microphone.
+MIC_LOG_SECONDS = 5.0
+
+
+def _dbfs(amplitude: float) -> float:
+    return 20 * math.log10(amplitude / 32768.0) if amplitude else -math.inf
+
+
+def pcm_dbfs(pcm_data: bytes) -> tuple[float, float]:
+    """RMS and peak level of 16-bit linear PCM, in dB relative to full scale."""
     count = len(pcm_data) // 2
+    if count == 0:
+        return -math.inf, -math.inf
     samples = struct.unpack(f"<{count}h", pcm_data[: count * 2])
-    sum_squares = sum(s * s for s in samples)
-    rms = math.sqrt(sum_squares / count)
-    return min(100.0, round((rms / 32768.0) * 100.0, 1))
+    rms = math.sqrt(sum(s * s for s in samples) / count)
+    peak = max(abs(s) for s in samples)
+    return _dbfs(rms), _dbfs(peak)
+
+
+def calculate_pcm_level(pcm_data: bytes) -> float:
+    """Level meter reading (0.0 to 100.0) on a dB scale from 16-bit linear PCM audio."""
+    rms_db, _ = pcm_dbfs(pcm_data)
+    level = (rms_db - METER_FLOOR_DBFS) / -METER_FLOOR_DBFS * 100.0
+    return round(min(100.0, max(0.0, level)), 1)
 
 
 async def handle_live_event(event: LiveEvent) -> None:
@@ -458,9 +476,11 @@ async def websocket_speaker(websocket: WebSocket):
         return
 
     last_rms_time = 0.0
+    mic_window = bytearray()
+    mic_window_start = time.time()
 
     async def receive_from_client() -> None:
-        nonlocal last_rms_time
+        nonlocal last_rms_time, mic_window_start
         try:
             while True:
                 message = await websocket.receive()
@@ -475,6 +495,18 @@ async def websocket_speaker(websocket: WebSocket):
                         last_rms_time = now
                         level = calculate_pcm_level(pcm_data)
                         await hub.broadcast({"type": "audio_level", "level": level})
+
+                    mic_window.extend(pcm_data)
+                    if now - mic_window_start >= MIC_LOG_SECONDS:
+                        rms_db, peak_db = pcm_dbfs(bytes(mic_window))
+                        logger.info(
+                            "Mic input (last %.0f s): RMS %.1f dBFS, peak %.1f dBFS",
+                            now - mic_window_start,
+                            rms_db,
+                            peak_db,
+                        )
+                        mic_window.clear()
+                        mic_window_start = now
 
                 elif text := message.get("text"):
                     try:

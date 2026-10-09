@@ -78,7 +78,7 @@ export class AudioCaptureService {
         audio: {
           channelCount: 1,
           echoCancellation: { ideal: true },
-          noiseSuppression: { ideal: false },
+          noiseSuppression: { ideal: true },
           autoGainControl: { ideal: true },
         },
       });
@@ -153,7 +153,9 @@ export class AudioCaptureService {
           sumSquares += sample * sample;
         }
         const rms = Math.sqrt(sumSquares / inputChannelData.length);
-        const levelPercent = Math.min(100, Math.round(rms * 250));
+        // dB scale: -60 dBFS (quiet room) reads 0, full scale 100; normal speech fills half or more.
+        const dbfs = rms > 0 ? 20 * Math.log10(rms) : -Infinity;
+        const levelPercent = Math.max(0, Math.min(100, Math.round(((dbfs + 60) / 60) * 100)));
         if (this.callbacks.onAudioLevel) {
           this.callbacks.onAudioLevel(levelPercent);
         }
