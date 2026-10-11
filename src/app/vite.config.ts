@@ -8,6 +8,19 @@ export default defineConfig({
     tailwindcss(),
     react(),
   ],
+  build: {
+    rolldownOptions: {
+      output: {
+        codeSplitting: {
+          groups: [
+            { name: 'react', test: /node_modules[\\/](react|react-dom|scheduler)[\\/]/ },
+            { name: 'mui', test: /node_modules[\\/](@mui|@emotion)[\\/]/ },
+            { name: 'vendor', test: /node_modules[\\/]/ },
+          ],
+        },
+      },
+    },
+  },
   server: {
     port: 5173,
     proxy: {
